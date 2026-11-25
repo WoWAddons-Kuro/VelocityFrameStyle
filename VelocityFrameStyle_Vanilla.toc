@@ -1,0 +1,42 @@
+## Interface: 11509
+## Title: Velocity Frame Style
+## Notes: Restyles Blizzard's own unit frames (player, target, pet) with a simple text-element grid and bar styling, and adds the missing pet-target frame. Era + Forever.
+## Author: Kuro
+## Version: @project-version@
+## SavedVariables: VelocityFrameStyleDB
+## OptionalDeps: LibStub, LibEditMode, LibSharedMedia-3.0
+## IconTexture: Interface\AddOns\VelocityFrameStyle\Assets\VelocityFrameStyle_Icon.tga
+## X-Website: https://github.com/WoWAddons-Kuro/VelocityFrameStyle
+## X-Credits: Frame geometry reference: Easy Frames (BSD, Mirmidonis / Usoltsev). Pet-target idea: Lazy Thom's PetTarget.
+
+Libs\LibStub\LibStub.lua
+Libs\LibEditMode\embed.xml
+
+Core\Util.lua
+
+Client\Client.lua
+Client\Client_ClassicEra.lua
+Client\Client_Forever.lua
+Client\Client_Select.lua
+
+Core\DB.lua
+Core\LayoutProfile.lua
+Core\Textures.lua
+Core\Format.lua
+Core\TextLayout.lua
+Core\Geometry.lua
+
+Frames\FrameBase.lua
+Frames\Player.lua
+Frames\Target.lua
+Frames\Pet.lua
+Frames\PetTarget.lua
+Frames\PetTargetVisibility.lua
+
+UI\Widgets.lua
+UI\MediaPicker.lua
+UI\EditMode.lua
+UI\FramePage.lua
+UI\Options.lua
+
+VelocityFrameStyle.lua

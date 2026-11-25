@@ -1,0 +1,12 @@
+package-as: VelocityFrameStyle
+
+ignore:
+  - README.md
+  - SPECS
+  - .github
+  - .gitignore
+  - .pkgmeta
+  - Assets/Screenshots
+  - Assets/VelocityFrameStyle_AppIcon.png
+  - Assets/VelocityFrameStyle_AppIcon.jpg
+  - Assets/VelocityFrameStyle_Icon_256.png

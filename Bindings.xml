@@ -1,0 +1,4 @@
+<Bindings>
+	<!-- BINDING_HEADER_VELOCITYFRAMESTYLE and BINDING_NAME_CLICK VelocityFrameStylePetTarget:LeftButton are set in
+	     VelocityFrameStyle.lua. A CLICK binding on the secure pet-target button targets the pet's target in combat. -->
+</Bindings>
