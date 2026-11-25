@@ -114,11 +114,42 @@ end
 -- look); we only strip Blizzard's own masks off the fill.
 local function ApplyFillMask(bar)
   local tex = bar:GetStatusBarTexture()
-  if not tex or bar.vfsUnmaskedTex == tex then return end
+  if not tex then return end
   if tex.GetNumMaskTextures then
     for i = tex:GetNumMaskTextures(), 1, -1 do local m = tex:GetMaskTexture(i); if m then pcall(tex.RemoveMaskTexture, tex, m) end end
   end
-  bar.vfsUnmaskedTex = tex
+end
+
+-- Native power-type/art updates overwrite the fill independently of our restyles.
+-- Reassert the chosen square texture at that boundary, never its value or anchors.
+function FrameBase.ApplyBarFill(st, bar)
+  if bar.vfsApplyingFill or not DB.Frame(st.id).enabled then return end
+  local function Sync() FrameBase.ApplyBarFill(st, bar) end
+  if not bar.vfsFillHooked then
+    bar.vfsFillHooked = true
+    hooksecurefunc(bar, "SetStatusBarTexture", Sync)
+    if bar.SetStatusBarAtlas then hooksecurefunc(bar, "SetStatusBarAtlas", Sync) end
+  end
+  bar.vfsApplyingFill = true
+  local ok, err = pcall(function()
+    bar:SetStatusBarTexture(Util.StatusBarPath(DB.Effective(st.id, "barTexture")))
+    local tex = bar:GetStatusBarTexture()
+    if tex then
+      tex:SetAlpha(1)
+      tex:SetHorizTile(false); tex:SetVertTile(false)
+      -- Blizzard can reuse the same Texture object or attach another mask later.
+      -- These hooks are on the MAIN fill only, never prediction FillMasks.
+      if not tex.vfsFillHooked then
+        tex.vfsFillHooked = true
+        hooksecurefunc(tex, "SetTexture", Sync)
+        if tex.SetAtlas then hooksecurefunc(tex, "SetAtlas", Sync) end
+        if tex.AddMaskTexture then hooksecurefunc(tex, "AddMaskTexture", Sync) end
+      end
+      ApplyFillMask(bar)
+    end
+  end)
+  bar.vfsApplyingFill = nil
+  if not ok then error(err, 0) end
 end
 
 -- Create / fetch the state for a frame -------------------------------------------------------------------
@@ -332,13 +363,10 @@ function FrameBase.ApplyAppearance(st)
   local id = st.id
   local enabled = DB.Frame(id).enabled
   if enabled then VFS.Geometry.ApplyBarDimensions(st) end
-  local texPath = Util.StatusBarPath(DB.Effective(id, "barTexture"))
   local backing = DB.Effective(id, "backingAlpha")
   for kind, bar in pairs(st.bars) do
     if enabled then
-      bar.stock:SetStatusBarTexture(texPath)
-      local t = bar.stock:GetStatusBarTexture(); if t then t:SetAlpha(1); t:SetHorizTile(false); t:SetVertTile(false) end
-      ApplyFillMask(bar.stock)
+      FrameBase.ApplyBarFill(st, bar.stock)
       if kind == "health" then ApplyHealthColor(bar.stock, st.unit) else ApplyPowerColor(bar.stock, st.unit) end
       FrameBase.ColorBackdrop(bar.stock, backing)
       bar.backdrop:Show()
