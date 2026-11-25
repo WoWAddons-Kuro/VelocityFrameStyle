@@ -17,17 +17,25 @@ VFS.Frames = {}     -- VFS_FrameID -> VFS_FrameState
 
 local WHITE8 = "Interface\\Buttons\\WHITE8x8"
 
--- Backdrop: black texture on a holder one level under the drawn bar ------------------------------
+-- Backdrop: black texture on a holder immediately BELOW the drawn bar (bar - 1). For an overlay painted under the
+-- chrome that is chrome - 2: still above everything Blizzard draws below the chrome, and still inside the chrome's
+-- clip window. (Level 0 was tried: it dropped under the chrome's own container and stopped being clipped.) ---------
 function FrameBase.AcquireBackdrop(bar)
   if bar.vfsBackdrop then return bar.vfsBackdrop end
   local h = CreateFrame("Frame", nil, bar:GetParent())
-  h:SetAllPoints(bar)
+  -- 1 px inset: the chrome's window edge is anti-aliased; a backing that reaches the rim shows as a dark halo.
+  h:SetPoint("TOPLEFT", bar, "TOPLEFT", 1, -1)
+  h:SetPoint("BOTTOMRIGHT", bar, "BOTTOMRIGHT", -1, 1)
   h.tex = h:CreateTexture(nil, "BACKGROUND", nil, -8)
   h.tex:SetAllPoints()
   h.tex:SetTexture(WHITE8)
-  local function Sync() h:SetFrameStrata(bar:GetFrameStrata()); h:SetFrameLevel(math.max(0, bar:GetFrameLevel() - 1)) end
+  local function Sync()
+    h:SetFrameStrata(bar:GetFrameStrata())
+    h:SetFrameLevel(math.max(0, bar:GetFrameLevel() - 1))
+  end
   Sync()
   hooksecurefunc(bar, "SetFrameLevel", Sync)
+  hooksecurefunc(bar, "SetFrameStrata", Sync)
   bar.vfsBackdrop = h
   return h
 end
@@ -55,13 +63,24 @@ FrameBase.ApplyHealthColor, FrameBase.ApplyPowerColor = ApplyHealthColor, ApplyP
 
 local function AcquireOverlay(state, kind, stock)
   if stock.vfsOverlay then return stock.vfsOverlay end
-  -- The slot is the masked container on Forever (Camelot sizes the bar taller than its container and clips it);
-  -- our overlay fills the CONTAINER rect so it sits exactly in the art's bar window.
+  -- Geometry: the slot is the masked container on Forever (Camelot sizes the bar taller than its container and
+  -- clips it); our overlay fills the CONTAINER rect so it sits in the art's bar window.
+  -- Layering (owner, 2026-11-25): paint the bar UNDER the chrome. The border art's transparent window then does the
+  -- clipping exactly as it does for Blizzard's own bar - no mask textures to chase. Chrome frame = the frame that
+  -- owns FrameArt (Client.ChromeFrame); overlay = chrome level - 1, parented to the chrome's parent so the level
+  -- is in the same space. Falls back to 'above the stock bar' where no chrome frame is known.
   local slot = Client.BarSlot(state.id, kind) or stock
-  local ov = CreateFrame("StatusBar", nil, slot:GetParent())
+  local chrome = Client.ChromeFrame(state.id)
+  local ov = CreateFrame("StatusBar", nil, chrome and chrome:GetParent() or slot:GetParent())
   ov:SetAllPoints(slot)
-  ov:SetFrameStrata(stock:GetFrameStrata())
-  ov:SetFrameLevel(stock:GetFrameLevel() + 1)
+  if chrome then
+    ov:SetFrameStrata(chrome:GetFrameStrata())
+    ov:SetFrameLevel(math.max(0, chrome:GetFrameLevel() - 1))
+    ov.vfsUnderChrome = true
+  else
+    ov:SetFrameStrata(stock:GetFrameStrata())
+    ov:SetFrameLevel(stock:GetFrameLevel() + 1)
+  end
   ov:EnableMouse(false)
   ov:SetMinMaxValues(0, 1)
   ov:SetValue(1)
@@ -83,16 +102,22 @@ local function AcquireOverlay(state, kind, stock)
   return ov
 end
 
--- Apply the stock mask to our overlay's fill so it is clipped to the art's rounded window like Blizzard's own.
+-- Apply the stock mask to our overlay's fill AND backdrop so both are clipped to the art's rounded window like
+-- Blizzard's own. Without masking the backdrop, its black rectangle pokes out where the container is wider than the
+-- visible window (Target mana bar runs under the portrait ring; Player's starts left of it).
+local function MaskTexture(tex, mask, holder, key)
+  if not tex or not mask or not tex.AddMaskTexture then return end
+  local prevTex, prevMask = holder[key .. "Tex"], holder[key .. "Mask"]
+  if prevTex == tex and prevMask == mask then return end
+  if prevTex and prevMask then pcall(prevTex.RemoveMaskTexture, prevTex, prevMask) end
+  if pcall(tex.AddMaskTexture, tex, mask) then holder[key .. "Tex"], holder[key .. "Mask"] = tex, mask end
+end
+
 local function ApplyOverlayMask(state, kind, ov)
   local mask = Client.BarMask(state.id, kind)
-  local tex = ov:GetStatusBarTexture()
-  if not tex or ov.vfsMaskedTex == tex then return end
-  if ov.vfsMaskedTex and ov.vfsMask then pcall(ov.vfsMaskedTex.RemoveMaskTexture, ov.vfsMaskedTex, ov.vfsMask) end
-  if mask and tex.AddMaskTexture then
-    local ok = pcall(tex.AddMaskTexture, tex, mask)
-    if ok then ov.vfsMaskedTex, ov.vfsMask = tex, mask end
-  end
+  if not mask then return end
+  MaskTexture(ov:GetStatusBarTexture(), mask, ov, "vfsFill")
+  if ov.vfsBackdrop then MaskTexture(ov.vfsBackdrop.tex, mask, ov, "vfsBack") end
 end
 
 -- Hide the stock fill so only the overlay shows (alpha, never Hide - R2; re-asserted on texture changes)
@@ -128,10 +153,12 @@ function FrameBase.Acquire(id)
       if not movable then SuppressStockFill(stock) end
     end
   end
-  -- Text host: must sit ABOVE whatever draws the bars. On Forever the bars live on nested content frames several
-  -- levels above the button, so base the host level on the highest drawn bar, not on the button.
+  -- Text host: must sit ABOVE the bars AND above the chrome (bars are now painted under the chrome; text must not be).
+  -- Base the level on the highest of {button, drawn bars, chrome frame}.
   local top = button:GetFrameLevel()
   for _, bar in pairs(st.bars) do top = math.max(top, bar.draw:GetFrameLevel()) end
+  local chrome = Client.ChromeFrame(id)
+  if chrome then top = math.max(top, chrome:GetFrameLevel()) end
   st.host = TextLayout.CreateHost(button, 1)
   st.host.top:SetFrameStrata(button:GetFrameStrata())
   st.host.top:SetFrameLevel(top + 3)

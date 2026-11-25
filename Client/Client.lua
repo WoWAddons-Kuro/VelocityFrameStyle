@@ -24,6 +24,8 @@ Client.INTERFACE = {
   "HealthBar",            -- (frameID) -> StatusBar|nil
   "PowerBar",             -- (frameID) -> StatusBar|nil
   "FrameArt",             -- (frameID) -> Texture|nil     the frame border art (SetVertexColor for border darkness)
+  "ChromeFrame",          -- (frameID) -> Frame|nil       the frame that OWNS the border art; our bars are painted one
+                          --                                level BELOW it so the art's transparent window clips them
   "Portrait",             -- (frameID) -> Texture|nil
   "NameText",             -- (frameID) -> FontString|nil  stock name (alpha-zeroed when our name element is active)
   "HealthTexts",          -- (frameID) -> { FontString, ... }  stock health strings (alpha-zeroed)

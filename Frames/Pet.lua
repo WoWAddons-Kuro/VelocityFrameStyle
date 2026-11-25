@@ -17,6 +17,16 @@ function Pet.Create()
   local st = FrameBase.Acquire("pet")
   if not st then return end
   local hb, pb = st.bars.health and st.bars.health.draw, st.bars.power and st.bars.power.draw
+  -- Forever: Blizzard's pet mana bar (77 px) is wider and starts left of the health bar (70 px); the overlay copies that
+  -- and reads as misaligned. Share the health bar's left edge and width; keep the stock bar's own vertical placement.
+  if pb and hb and st.bars.power and not st.bars.power.inPlace then
+    local stockP = st.bars.power.stock
+    pb:ClearAllPoints()
+    pb:SetPoint("TOP", stockP, "TOP", 0, 0)
+    pb:SetPoint("BOTTOM", stockP, "BOTTOM", 0, 0)
+    pb:SetPoint("LEFT", hb, "LEFT", 0, 0)
+    pb:SetPoint("RIGHT", hb, "RIGHT", 0, 0)
+  end
   st.slots = { health = hb, power = pb, nameplate = hb and FrameBase.NameRowAbove(st, hb, 12, 1), above = hb, below = pb or hb }
   if st.bars.health and st.bars.health.inPlace then
     VFS.Geometry.PlaceBar("pet", st.bars.health.stock, { point = ERA_HEALTH.point, relTo = st.button, relPoint = ERA_HEALTH.relPoint, x = ERA_HEALTH.x, y = ERA_HEALTH.y, width = ERA_HEALTH.width, height = ERA_HEALTH.height })

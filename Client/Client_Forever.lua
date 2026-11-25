@@ -67,6 +67,14 @@ VFS.ClientFlavours.forever = {
     elseif id == "pet" then return PetFrameTexture
     elseif id == "pettarget" then local f = Root(id); return f and f.texture end
   end,
+  -- The frame whose BORDER art has the transparent bar window. Player/Target: the *Container child frame.
+  -- Pet: PetFrameTexture sits on PetFrame itself. Our bars go one level under this frame.
+  ChromeFrame = function(id)
+    if id == "player" then return P(PlayerFrame, "PlayerFrameContainer")
+    elseif id == "target" then return P(TargetFrame, "TargetFrameContainer")
+    elseif id == "pet" then return PetFrame
+    elseif id == "pettarget" then local f = Root(id); return f and f.art end
+  end,
   Portrait = function(id)
     if id == "player" then return P(PlayerFrame, "PlayerFrameContainer.PlayerPortrait")
     elseif id == "target" then return P(TargetFrame, "TargetFrameContainer.Portrait")

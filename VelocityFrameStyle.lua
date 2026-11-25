@@ -90,12 +90,27 @@ local function DumpRects(id)
   Util.DumpFooter("/vfs rects " .. id)
 end
 
+-- /vfs values <frame>: are this unit's numbers secret on this client? Decides adopt-vs-compute for the grid.
+local function DumpValues(id)
+  local unit = Client.Unit(id)
+  Util.DumpHeader("/vfs values " .. id .. " (" .. tostring(unit) .. ")")
+  local function S(label, v) Util.Print("%-14s secret=%s type=%s plain=%s", label, tostring(Util.IsSecret(v)), type(v), tostring(Util.Plain(v))) end
+  S("UnitHealth", UnitHealth(unit)); S("UnitHealthMax", UnitHealthMax(unit))
+  S("UnitPower", UnitPower(unit)); S("UnitPowerMax", UnitPowerMax(unit))
+  S("UnitLevel", UnitLevel(unit)); S("UnitName", (UnitName(unit)))
+  local cur, max, pct = Client.HealthValues(unit)
+  Util.Print("Client.HealthValues -> cur=%s max=%s pct=%s", tostring(cur), tostring(max), tostring(pct))
+  Util.Print("Format [hp]=|%s| [hp%%]=|%s| [power]=|%s|", VFS.Format.Expand("[hp]", unit), VFS.Format.Expand("[hp%]", unit), VFS.Format.Expand("[power]", unit))
+  Util.DumpFooter("/vfs values " .. id)
+end
+
 local function Slash(msg)
   msg = (msg or ""):lower():match("^%s*(.-)%s*$")
   local cmd, arg = msg:match("^(%S+)%s*(%S*)$")
   if msg == "status" then Status()
   elseif cmd == "text" then DumpText(arg ~= "" and arg or "player")
   elseif cmd == "rects" then DumpRects(arg ~= "" and arg or "player")
+  elseif cmd == "values" then DumpValues(arg ~= "" and arg or "player")
   elseif msg == "editmode" or msg == "edit" then VFS.EditMode.Open()
   elseif msg == "restyle" then VFS.FrameBase.RestyleAll(); Util.Print("restyled")
   else VFS.Options.Open() end

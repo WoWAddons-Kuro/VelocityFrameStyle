@@ -26,13 +26,18 @@
 
 ## Milestones
 
-- [ ] **M0 — Forever bring-up: Player, Target, Pet, PetTarget [D: Forever first].** Repo, three TOCs, Client layout,
+- [x] **M0 — Forever bring-up: Player, Target, Pet, PetTarget [D: Forever first]** (first working build 2026-11-25, `7efb63b`). Repo, three TOCs, Client layout,
       shared `TextLayout` + `Format` lifted from PlateStyle, `Frames\*.lua` for the four frames with text grid + bar
       texture/backing/border using the **overlay-bar strategy** (§Frame strategies) and secret-safe token degradation
       from day one, PetTarget module ported from VPTF (frame, secure visibility, soft-hide, LibEditMode placement, pet
       bar backdrop), GotJunk-style options page with one section per frame, R7 stand-down when EasyFrames is loaded.
       Region paths confirmed with `/fstack` on Forever before any `Client_Forever.lua` resolver is trusted.
       **Exit:** owner plays Forever with EasyFrames disabled and nothing is worse than before.
+      **Bring-up findings [D]:** (a) `UnitHealth("player")` is secret on Forever even for the player → the Health/Power
+      elements **adopt Blizzard's own `HealthBarText`/`ManaBarText`** (secure-written, content never read; re-parented,
+      re-fonted, laid out by the grid) via `Client.StockValueText` + `TextLayout.AdoptStock`. Era computes tokens itself.
+      (b) Camelot sizes stock bars taller than their masked containers; overlays fill `Client.BarSlot` (the container) and
+      take the stock `Client.BarMask`. (c) Diagnostics `/vfs text|rects|values <frame>` are permanent (owner: no long `/run`s).
 - [ ] **M1 — Era adaptor** for the same four frames: flat region globals, `UNIT_HEALTH`/`UNIT_POWER_UPDATE`
       registration (no secrets), and the **restyle-in-place** bar strategy via `Geometry` (the R2 exception). Era is
       the relaxation of Forever: nothing Forever does is removed, Era only gains the number tokens and in-place bars.
