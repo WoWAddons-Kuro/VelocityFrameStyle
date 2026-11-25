@@ -56,11 +56,15 @@ function PetTarget.Create()
   f.portrait:SetPoint("TOPRIGHT", -24, -16)
 
   f.health = CreateFrame("StatusBar", nil, f)
+  -- Reserve levels below the bars for chrome/glow. At the default child level
+  -- Chrome's level clamp put its plate and glow ABOVE our fills.
+  f.health:SetFrameLevel(f:GetFrameLevel() + 4)
   f.health:SetSize(119, 12)
   f.health:SetPoint("TOPRIGHT", -90, -45)
   f.health:SetMinMaxValues(0, 1); f.health:SetValue(1); f.health:EnableMouse(false)
 
   f.power = CreateFrame("StatusBar", nil, f)
+  f.power:SetFrameLevel(f:GetFrameLevel() + 4)
   f.power:SetSize(119, 12)
   f.power:SetPoint("TOPRIGHT", -90, -56)
   f.power:SetMinMaxValues(0, 1); f.power:SetValue(0); f.power:EnableMouse(false)
@@ -129,8 +133,9 @@ function PetTarget.Create()
   st.bars.power  = { stock = f.power,  backdrop = FrameBase.AcquireBackdrop(f.power),  movable = true }
   local L = VFS.Chrome.LAYOUT.pettarget
   f.health:ClearAllPoints(); f.health:SetPoint("RIGHT", f.portrait, "LEFT", -8, 4); f.health:SetSize(L.health.w, L.health.h)
-  f.power:ClearAllPoints();  f.power:SetPoint("TOPRIGHT", f.health, "BOTTOMRIGHT", 0, -1); f.power:SetSize(L.power.w, L.power.h)
-  st.host = TextLayout.CreateHost(f, 5)
+  f.power:ClearAllPoints();  f.power:SetPoint("TOPRIGHT", f.health, "BOTTOMRIGHT", 0, -FrameBase.BAR_BORDER_WIDTH); f.power:SetSize(L.power.w, L.power.h)
+  st.host = TextLayout.CreateHost(f, 7)
+  f.art:SetFrameLevel(f:GetFrameLevel() + 6)
   st.slots = { health = f.health, power = f.power, nameplate = FrameBase.NameRowAbove(st, f.health), above = f.health, below = f.power }
   VFS.Frames.pettarget = st
   PetTarget.state = st
@@ -142,7 +147,7 @@ end
 -- Protected placement/scale: caller ensures not InCombatLockdown() -----------------------------------
 function PetTarget.ApplyPlacement()
   if not f or InCombatLockdown() then return false end
-  f:SetScale(G().petTargetScale)
+  -- No zoom: dimensions change the bars; frame stays at its natural scale.
   local p = DB.Profile().petTargetPlacement
   f:ClearAllPoints()
   if p.anchorTo == "PetFrame" and PetFrame then
@@ -151,7 +156,7 @@ function PetTarget.ApplyPlacement()
     local fb = DB.FALLBACK_PLACEMENT
     f:SetPoint(fb.point, UIParent, fb.point, fb.x, fb.y)
   else
-    f:SetPoint(p.point, UIParent, p.point, p.x, p.y)
+    f:SetPoint(p.point, UIParent, p.relPoint or p.point, p.x, p.y)
   end
   return true
 end
@@ -189,23 +194,15 @@ local function UpdatePortrait(force)
 end
 
 local function UpdateBars()
-  local g = G()
-  if UnitIsDeadOrGhost(UNIT) then
-    f.health:SetMinMaxValues(0, 1); f.health:SetValue(0); f.deadText:Show()
-  else
-    f.deadText:Hide()
-    local _, _, pct = Client.HealthValues(UNIT)
-    f.health:SetMinMaxValues(0, 1); f.health:SetValue(pct or 0)
-    local cc = g.classColorHealth and ClassColor(UNIT)
-    if cc then f.health:SetStatusBarColor(cc.r, cc.g, cc.b) else f.health:SetStatusBarColor(0, 1, 0) end
-  end
-  local _, pmax, ppct, token = Client.PowerValues(UNIT)
-  f.power:SetMinMaxValues(0, 1)
-  if not pmax or pmax <= 0 then f.power:SetValue(0) else
-    f.power:SetValue(ppct or 0)
-    local c = token and PowerBarColor and PowerBarColor[token]
-    if c then f.power:SetStatusBarColor(c.r, c.g, c.b) else f.power:SetStatusBarColor(0, 0, 1) end
-  end
+  -- Widget setters accept secret numbers. Do not discard them via PlainNumber,
+  -- divide them in Lua, or turn an unavailable computed percentage into zero.
+  f.health:SetMinMaxValues(0, UnitHealthMax(UNIT))
+  f.health:SetValue(UnitHealth(UNIT))
+  f.power:SetMinMaxValues(0, UnitPowerMax(UNIT))
+  f.power:SetValue(UnitPower(UNIT))
+  FrameBase.ApplyHealthColor(f.health, UNIT)
+  FrameBase.ApplyPowerColor(f.power, UNIT)
+  f.deadText:Hide()
 end
 
 local function UpdateMisc()
@@ -216,7 +213,9 @@ local function UpdateMisc()
   f.skull:SetShown(lvl ~= nil and lvl < 0)
   local idx = Util.PlainNumber(GetRaidTargetIndex(UNIT), nil)
   if idx and idx >= 1 and idx <= 8 then SetRaidTargetIconTexture(f.raidIcon, idx); f.raidIcon:Show() else f.raidIcon:Hide() end
-  f.flash:SetShown(UnitAffectingCombat(UNIT) == true)
+  -- The legacy full-frame flash must not overlay the geometric bars.
+  f.flash:Hide()
+  VFS.Chrome.UpdateCombat(PetTarget.state)
 end
 
 function PetTarget.Update()

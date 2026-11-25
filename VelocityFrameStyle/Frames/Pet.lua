@@ -12,7 +12,7 @@ local function PlaceBars(st)
   local hb, pb = FrameBase.Bar(st, "health"), FrameBase.Bar(st, "power")
   local portrait = Client.Portrait("pet")
   if hb and portrait then Geometry.PlaceBar("pet", hb, { point = "BOTTOMLEFT", relTo = portrait, relPoint = "RIGHT", x = 2, y = -3.5, width = L.health.w, height = L.health.h }) end
-  if pb and hb then Geometry.PlaceBar("pet", pb, { point = "TOPLEFT", relTo = hb, relPoint = "BOTTOMLEFT", x = 0, y = -1, width = L.health.w, height = L.power.h }) end
+  if pb and hb then Geometry.PlaceBar("pet", pb, { point = "TOPLEFT", relTo = hb, relPoint = "BOTTOMLEFT", x = 0, y = -FrameBase.BAR_BORDER_WIDTH, width = L.health.w, height = L.power.h }) end
 end
 
 function Pet.Create()

@@ -11,7 +11,7 @@ local function PlaceBars(st)
   local hb, pb = FrameBase.Bar(st, "health"), FrameBase.Bar(st, "power")
   -- EF-Forever puts the health bar CENTERed in the frame at (-30, 8) mirrored for the player (bars right of portrait)
   if hb then Geometry.PlaceBar("player", hb, { point = "LEFT", relTo = st.button, relPoint = "LEFT", x = 86, y = 6, width = L.health.w, height = L.health.h }) end
-  if pb and hb then Geometry.PlaceBar("player", pb, { point = "TOPLEFT", relTo = hb, relPoint = "BOTTOMLEFT", x = -2, y = -1, width = L.power.w, height = L.power.h }) end
+  if pb and hb then Geometry.PlaceBar("player", pb, { point = "TOPLEFT", relTo = hb, relPoint = "BOTTOMLEFT", x = 0, y = -FrameBase.BAR_BORDER_WIDTH, width = L.power.w, height = L.power.h }) end
 end
 
 function Player.Create()

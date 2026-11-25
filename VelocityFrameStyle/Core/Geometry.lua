@@ -19,6 +19,11 @@ end
 function Geometry.PlaceBar(frameID, bar, spec)
   if not bar or not Allowed(frameID, bar) then return false end
   if InCombatLockdown() then return false end
+  if VFS.DB.Frame(frameID) then
+    local kind = bar == VFS.Client.HealthBar(frameID) and "healthHeight" or "powerHeight"
+    spec.width = VFS.DB.BarDimension(frameID, "barWidth")
+    spec.height = VFS.DB.BarDimension(frameID, kind)
+  end
   local ok, err = pcall(function()
     bar:ClearAllPoints()
     bar:SetPoint(spec.point, spec.relTo, spec.relPoint, spec.x or 0, spec.y or 0)
@@ -40,4 +45,23 @@ function Geometry.PlaceBar(frameID, bar, spec)
     bar.vfsGeometrySpec = spec
   end
   return ok
+end
+
+-- Resize inner surfaces only; border/background/text anchors follow automatically.
+function Geometry.ApplyBarDimensions(st)
+  if InCombatLockdown() then st.dimensionsPending = true; return false end
+  st.dimensionsPending = nil
+  for kind, bar in pairs(st.bars) do
+    if st.id == "pettarget" or Allowed(st.id, bar.stock) then
+      local width = VFS.DB.BarDimension(st.id, "barWidth")
+      local height = VFS.DB.BarDimension(st.id, kind == "health" and "healthHeight" or "powerHeight")
+      bar.stock:SetWidth(width)
+      bar.stock:SetHeight(height)
+      if bar.stock.vfsGeometrySpec then
+        bar.stock.vfsGeometrySpec.width = width
+        bar.stock.vfsGeometrySpec.height = height
+      end
+    end
+  end
+  return true
 end

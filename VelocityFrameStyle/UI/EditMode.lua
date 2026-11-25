@@ -1,6 +1,6 @@
 -- Velocity Frame Style: Edit Mode integration (vendored LibEditMode) for the pet-target frame only - Blizzard's own
 -- frames are already Edit Mode systems (R10). Placement is saved into the active layout's record (Core\LayoutProfile);
--- the Edit Mode dialog carries the Scale slider. While Edit Mode is open the frame is forced visible with sample data.
+-- the Edit Mode dialog carries bar width/height sliders, not zoom. Edit Mode forces visible sample data.
 local ADDON_NAME, VFS = ...
 local Util, DB = VFS.Util, VFS.DB
 
@@ -30,19 +30,26 @@ local function Register()
   if not frame then return end
   local fb = DB.FALLBACK_PLACEMENT
   lib:AddFrame(frame, OnMoved, { point = fb.point, x = fb.x, y = fb.y }, "Pet Target")
-  lib:AddFrameSettings(frame, {
-    {
-      kind = lib.SettingType.Slider, name = "Scale", desc = "Size of the pet-target frame.",
-      default = DB.DEFAULT_GLOBAL.petTargetScale, minValue = 0.5, maxValue = 1.5, valueStep = 0.05,
-      formatter = function(v) return string.format("%d%%", math.floor(v * 100 + 0.5)) end,
-      get = function() return DB.Global().petTargetScale end,
+  local settings = {}
+  for _, definition in ipairs(DB.DIMENSION_CONTROLS) do
+    local key = definition.key
+    local layout = VFS.Chrome.LAYOUT.pettarget
+    local default = key == "barWidth" and layout.health.w
+      or (key == "healthHeight" and layout.health.h or layout.power.h)
+    settings[#settings + 1] = {
+      kind = lib.SettingType.Slider, name = definition.label,
+      desc = "Changes bar dimensions only, not portrait, text or border size.",
+      default = default, minValue = definition.min, maxValue = definition.max, valueStep = 1,
+      formatter = function(v) return string.format("%d UI px", v) end,
+      get = function() return DB.BarDimension("pettarget", key) end,
       set = function(_, value)
-        DB.Global().petTargetScale = value
-        VFS.PetTarget.ApplyPlacement()
+        DB.SetBarDimension("pettarget", key, value)
+        VFS.FrameBase.Restyle("pettarget")
         if VFS.Options and VFS.Options.Refresh then VFS.Options.Refresh() end
       end,
-    },
-  })
+    }
+  end
+  lib:AddFrameSettings(frame, settings)
   registered = true
 end
 

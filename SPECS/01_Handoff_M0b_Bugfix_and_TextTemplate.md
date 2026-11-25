@@ -22,6 +22,12 @@ now clears on leaving combat, zzz + swords kept. "VERY close" (owner). Rounded b
 
 ### B1 — Pet-target frame does NOT remember its Edit Mode position (TOP PRIORITY, owner: capitals + expletive)
 
+**Session update:** owner confirms the frame now stays where placed. Located cause: `DB.Profile()` recursively
+filled placement defaults, restoring `anchorTo = "PetFrame"` after `OnMoved` deliberately cleared it. Placement
+is now defaulted only when the entire record is missing; `ApplyPlacement` also honours saved `relPoint`.
+`/vfs ptpos` prints saved and actual placement. Reload and layout-switch acceptance still needs explicit confirmation.
+The earlier hypotheses below are retained as investigation history, not the confirmed cause.
+
 **Symptom:** move it in Edit Mode → it reappears somewhere else; moving again doesn't stick.
 
 **What is known (code path, `UI\EditMode.lua`, `Frames\PetTarget.lua`, `Core\LayoutProfile.lua`):**

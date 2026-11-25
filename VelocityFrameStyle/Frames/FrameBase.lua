@@ -16,33 +16,53 @@ local FrameBase = {}
 VFS.FrameBase = FrameBase
 VFS.Frames = {}     -- VFS_FrameID -> VFS_FrameState
 
-local WHITE8 = "Interface\\Buttons\\WHITE8x8"
-local BAR_EDGE = "Interface\\AddOns\\" .. ADDON_NAME .. "\\Assets\\bar_edge.tga"   -- 24x24 radius-4 rounded square (edge-only 9-slice)
-local BAR_EDGE_SIZE, BAR_EDGE_INSET = 8, 4
+-- Border renderer contract: reference region = INNER surface; thickness grows OUTWARD.
+-- Both copies use these exact anchors. Replacing this renderer with a rounded atlas
+-- later must not change any bar sizing, placement, background or value handling.
+FrameBase.BAR_BORDER_WIDTH = 6
+function FrameBase.CreateSurfaceBorder(parent, surface, thickness)
+  local border = CreateFrame("Frame", nil, parent)
+  border:EnableMouse(false)
+  border:SetPoint("TOPLEFT", surface, "TOPLEFT", -thickness, thickness)
+  border:SetPoint("BOTTOMRIGHT", surface, "BOTTOMRIGHT", thickness, -thickness)
+  border.edges = {}
+  for _, side in ipairs({ "top", "bottom", "left", "right" }) do
+    local edge = border:CreateTexture(nil, "BORDER")
+    edge:SetColorTexture(0, 0, 0, 1)
+    border.edges[side] = edge
+  end
+  local e = border.edges
+  e.top:SetPoint("TOPLEFT", border, "TOPLEFT")
+  e.top:SetPoint("BOTTOMRIGHT", surface, "TOPRIGHT", thickness, 0)
+  e.bottom:SetPoint("TOPLEFT", surface, "BOTTOMLEFT", -thickness, 0)
+  e.bottom:SetPoint("BOTTOMRIGHT", border, "BOTTOMRIGHT")
+  e.left:SetPoint("TOPLEFT", surface, "TOPLEFT", -thickness, 0)
+  e.left:SetPoint("BOTTOMRIGHT", surface, "BOTTOMLEFT")
+  e.right:SetPoint("TOPLEFT", surface, "TOPRIGHT")
+  e.right:SetPoint("BOTTOMRIGHT", surface, "BOTTOMRIGHT", thickness, 0)
+  function border:SetBorderColor(r, g, b, a)
+    for _, edge in pairs(self.edges) do edge:SetColorTexture(r, g, b, a) end
+  end
+  return border
+end
 
--- Backdrop + rounded inset. The bar fill is a plain rectangle (StatusBars cannot be clipped to a shape without a
--- stretched mask, which went elliptical). So the ROUNDING is drawn on top: a dark rounded-corner RING (edge-only
--- 9-slice of bar_edge.tga, no bgFile) in the plate colour sits one frame level ABOVE the bar and covers its corners,
--- making the fill read as a rounded bar inside a dark rounded cut-out (owner 2026-11-25: "clipped behind a dark
--- rounded rect"). The dark backdrop behind the fill is a separate holder one level BELOW the bar as before.
+-- Four layers, all anchored to the SAME inner rect (the stock StatusBar):
+-- opaque border below / translucent black surface / stock fill / identical border above.
+-- Flat borders have an empty centre; the later rounded renderer adds corner cut-outs.
 function FrameBase.AcquireBackdrop(bar)
   if bar.vfsBackdrop then return bar.vfsBackdrop end
   local h = CreateFrame("Frame", nil, bar:GetParent())
+  h:EnableMouse(false)
   h:SetAllPoints(bar)
+  h.border = FrameBase.CreateSurfaceBorder(h, bar, FrameBase.BAR_BORDER_WIDTH)
   h.tex = h:CreateTexture(nil, "BACKGROUND", nil, -8)
-  h.tex:SetAllPoints()
-  h.tex:SetTexture(WHITE8)
-  -- the rounded inset ring, above the bar so it covers the fill's square corners
-  local ring = CreateFrame("Frame", nil, bar:GetParent(), BackdropTemplateMixin and "BackdropTemplate" or nil)
-  ring:SetPoint("TOPLEFT", bar, "TOPLEFT", -1, 1)
-  ring:SetPoint("BOTTOMRIGHT", bar, "BOTTOMRIGHT", 1, -1)
-  if ring.SetBackdrop then
-    ring:SetBackdrop({ edgeFile = BAR_EDGE, edgeSize = BAR_EDGE_SIZE, insets = { left = BAR_EDGE_INSET, right = BAR_EDGE_INSET, top = BAR_EDGE_INSET, bottom = BAR_EDGE_INSET } })
-  end
-  ring:EnableMouse(false)
+  h.tex:SetAllPoints(bar)
+  h.tex:SetColorTexture(0, 0, 0, 0.3)
+  local ring = FrameBase.CreateSurfaceBorder(bar:GetParent(), bar, FrameBase.BAR_BORDER_WIDTH)
   h.ring = ring
   local function Sync()
     h:SetFrameStrata(bar:GetFrameStrata()); h:SetFrameLevel(math.max(0, bar:GetFrameLevel() - 1))
+    h.border:SetFrameLevel(h:GetFrameLevel())
     ring:SetFrameStrata(bar:GetFrameStrata()); ring:SetFrameLevel(bar:GetFrameLevel() + 1)
   end
   Sync()
@@ -52,11 +72,10 @@ function FrameBase.AcquireBackdrop(bar)
   return h
 end
 
--- Colour the inset ring to match the plate (so the bar's corners look cut out of the plate)
-function FrameBase.ColorBackdrop(bar, backingAlpha, pr, pg, pb, pa)
+-- Background alpha is independent of the two always-opaque black border copies.
+function FrameBase.ColorBackdrop(bar, backingAlpha)
   local h = bar.vfsBackdrop; if not h then return end
   h.tex:SetColorTexture(0, 0, 0, backingAlpha)
-  if h.ring.SetBackdropBorderColor then h.ring:SetBackdropBorderColor(pr, pg, pb, pa) end
 end
 
 -- Colour policy (owner): health GREEN or class colour (players, when classColorHealth); power = PowerBarColor[token].
@@ -141,8 +160,9 @@ function FrameBase.NameRowAbove(st, bar, rowHeight, gap)
   if st.nameRow then return st.nameRow end
   local row = CreateFrame("Frame", nil, st.host.top)
   row:SetHeight(rowHeight or 12)
-  row:SetPoint("BOTTOMLEFT", bar, "TOPLEFT", 0, gap or 2)
-  row:SetPoint("BOTTOMRIGHT", bar, "TOPRIGHT", 0, gap or 2)
+  local clearance = FrameBase.BAR_BORDER_WIDTH + (gap or 2)
+  row:SetPoint("BOTTOMLEFT", bar, "TOPLEFT", 0, clearance)
+  row:SetPoint("BOTTOMRIGHT", bar, "TOPRIGHT", 0, clearance)
   st.nameRow = row
   return row
 end
@@ -167,20 +187,44 @@ function FrameBase.ApplyPortrait(st)
 end
 
 -- Appearance (cosmetic; legal in combat) ----------------------------------------------------------------
+-- Collapse only when max power is a readable zero; empty resources still have
+-- positive capacity. Secret/unknown capacities must not be compared or guessed.
+function FrameBase.RefreshPowerVisibility(st)
+  if st.id ~= "target" and st.id ~= "pettarget" then return false end
+  local power = st.bars.power
+  if not power then return false end
+  local preview = st.id == "pettarget" and VFS.PetTarget.IsSample()
+  local maxPower = Util.PlainNumber(UnitPowerMax(st.unit), nil)
+  local absent = DB.Frame(st.id).enabled and not preview and maxPower ~= nil and maxPower == 0
+  local changed = st.powerAbsent ~= absent
+  st.powerAbsent = absent
+  power.stock:SetAlpha(absent and 0 or 1)
+  power.backdrop:SetAlpha(absent and 0 or 1)
+  power.backdrop.ring:SetAlpha(absent and 0 or 1)
+  if absent then
+    st.slots.power = nil
+    st.slots.below = st.bars.health and st.bars.health.stock
+  else
+    st.slots.power = power.stock
+    st.slots.below = power.stock
+  end
+  if changed and VFS.Chrome then VFS.Chrome.Layout(st) end
+  return changed
+end
+
 function FrameBase.ApplyAppearance(st)
   local id = st.id
   local enabled = DB.Frame(id).enabled
+  if enabled then VFS.Geometry.ApplyBarDimensions(st) end
   local texPath = Util.StatusBarPath(DB.Effective(id, "barTexture"))
   local backing = DB.Effective(id, "backingAlpha")
-  local pc = DB.Global().plateColor or { 0.02, 0.02, 0.02 }
-  local pa = DB.Global().plateAlpha or 0.9
   for kind, bar in pairs(st.bars) do
     if enabled then
       bar.stock:SetStatusBarTexture(texPath)
       local t = bar.stock:GetStatusBarTexture(); if t then t:SetAlpha(1); t:SetHorizTile(false); t:SetVertTile(false) end
       ApplyFillMask(bar.stock)
       if kind == "health" then ApplyHealthColor(bar.stock, st.unit) else ApplyPowerColor(bar.stock, st.unit) end
-      FrameBase.ColorBackdrop(bar.stock, backing, pc[1], pc[2], pc[3], pa)
+      FrameBase.ColorBackdrop(bar.stock, backing)
       bar.backdrop:Show()
       bar.backdrop.ring:Show()
     else
@@ -207,6 +251,7 @@ function FrameBase.ApplyAppearance(st)
   for _, e in ipairs(elements) do TextLayout.ApplyFont(TextLayout.AcquireText(st.host, e.id), font, e.size, style) end
   TextLayout.PruneTexts(st.host, elements)
   if not enabled then for _, t in pairs(st.host.text) do if not t.vfsAdopted then t:Hide() end end end
+  FrameBase.RefreshPowerVisibility(st)
   if VFS.Chrome then VFS.Chrome.SetShown(st, enabled); VFS.Chrome.Layout(st); VFS.Chrome.ApplyColors(st); VFS.Chrome.UpdateCombat(st) end
 end
 
@@ -214,7 +259,18 @@ end
 function FrameBase.ApplyTexts(st, filter)
   if not DB.Frame(st.id).enabled then return end
   if not UnitExists(st.unit) then for _, t in pairs(st.host.text) do if not t.vfsAdopted then t:Hide() end end return end
+  local powerChanged = FrameBase.RefreshPowerVisibility(st)
+  if powerChanged then filter = nil end
   TextLayout.ApplyTexts(st.host, DB.Elements(st.id), st.unit, Client.NameText(st.id), filter)
+  if st.powerAbsent then
+    for _, e in ipairs(DB.Elements(st.id)) do
+      local fs = st.host.text[e.id]
+      if fs and (e.anchor == "power" or VFS.Format.UsesPower(e.format)) then
+        fs.vfsVisible = false
+        if fs.vfsAdopted then fs:SetAlpha(0) else fs:Hide() end
+      end
+    end
+  end
   TextLayout.Layout(st.host, DB.Elements(st.id), st.slots)
 end
 
@@ -246,6 +302,10 @@ end
 function FrameBase.Restyle(id)
   local st = VFS.Frames[id]
   if not st then return end
+  if id == "pettarget" and VFS.PetTarget.IsSample() then
+    VFS.PetTarget.SetSample(true)
+    return
+  end
   FrameBase.ApplyAppearance(st)
   FrameBase.ApplyTexts(st)
 end

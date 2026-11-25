@@ -115,19 +115,28 @@ function TextLayout.ApplyTexts(host, elements, unit, stockNameFS, filter)
         changed = true
       else
       local text
+      local directValue = false
       if Format.IsBareName(e.format) then
         text = VFS.Client.UnitDisplayName(unit)   -- may be a secret; SetText accepts it
-        if text == nil then text = "" end
+        directValue = true
+      elseif unit == "pettarget" and e.format == "[hp]" then
+        text = UnitHealth(unit)
+        directValue = true
+      elseif unit == "pettarget" and e.format == "[power]" then
+        text = UnitPower(unit)
+        directValue = true
       else
         text = Format.ExpandOrEmpty(e.format, unit)
       end
-      local visible = e.anchor ~= "hidden" and not (type(text) == "string" and text == "")
+      -- Direct widget values can be secret: never compare their content or measure
+      -- their rendered width in Lua. Layout uses anchors instead.
+      local visible = e.anchor ~= "hidden" and (directValue or text ~= "")
       if fs.vfsVisible ~= visible then changed = true end
       fs.vfsVisible = visible
       fs:SetText(text)
       fs:SetTextColor(TextLayout.ColorFor(e, unit, (e.id == "name" or e.id == "level") and stockNameFS or nil))
       fs:SetShown(visible)
-      if visible and not Format.IsBareName(e.format) then
+      if visible and not directValue then
         local w = fs:GetStringWidth() or 0
         if fs.vfsWidth ~= w then changed = true end
         fs.vfsWidth = w

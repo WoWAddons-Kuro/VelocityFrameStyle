@@ -81,10 +81,17 @@ local function DumpRects(id)
   local st = VFS.Frames[id]
   if not st then Util.Print("no frame state for %s", tostring(id)) return end
   Util.DumpHeader("/vfs rects " .. id)
-  local function R(label, f) if not f then Util.Print("%-14s nil", label) return end local _, _, w, h = f:GetRect() Util.Print("%-14s %dx%d", label, math.floor((w or 0) + 0.5), math.floor((h or 0) + 0.5)) end
+  local function R(label, f)
+    if not f then Util.Print("%-14s nil", label) return end
+    local _, _, w, h = f:GetRect()
+    local scale = f.GetEffectiveScale and f:GetEffectiveScale() or f:GetParent():GetEffectiveScale()
+    Util.Print("%-14s local=%.2fx%.2f effectiveScale=%.3f scaled=%.2fx%.2f", label,
+      w or 0, h or 0, scale, (w or 0) * scale, (h or 0) * scale)
+  end
   R("button", st.button)
   for kind, bar in pairs(st.bars) do
     R(kind .. ".bar", bar.stock); R(kind .. ".backdrop", bar.backdrop)
+    R(kind .. ".border", bar.backdrop.ring)
   end
   R("portrait", Client.Portrait(id))
   if st.chrome then R("chrome.disc", st.chrome.disc); R("chrome.plate", st.chrome.plate) end
@@ -153,6 +160,17 @@ local function Slash(msg)
   msg = (msg or ""):lower():match("^%s*(.-)%s*$")
   local cmd, arg = msg:match("^(%S+)%s*(%S*)$")
   if msg == "status" then Status()
+  elseif msg == "ptpos" then
+    local frame = VFS.PetTarget.frame
+    Util.Print(VFS.LayoutProfile.Status())
+    local saved = DB.Profile().petTargetPlacement
+    Util.Print("saved: anchorTo=%s point=%s relPoint=%s x=%s y=%s", tostring(saved.anchorTo),
+      tostring(saved.point), tostring(saved.relPoint), tostring(saved.x), tostring(saved.y))
+    if frame then
+      local point, relative, relPoint, x, y = frame:GetPoint(1)
+      Util.Print("actual: relative=%s point=%s relPoint=%s x=%s y=%s scale=%s", tostring(relative and relative:GetName()),
+        tostring(point), tostring(relPoint), tostring(x), tostring(y), tostring(frame:GetScale()))
+    end
   elseif cmd == "text" then DumpText(arg ~= "" and arg or "player")
   elseif cmd == "rects" then DumpRects(arg ~= "" and arg or "player")
   elseif cmd == "values" then DumpValues(arg ~= "" and arg or "player")
@@ -225,6 +243,9 @@ local function OnEvent(_, event, arg1, arg2)
     end
   elseif event == "PLAYER_REGEN_ENABLED" then
     VFS.PetTargetVisibility.OnRegenEnabled()
+    for id, st in pairs(VFS.Frames) do
+      if st.dimensionsPending then VFS.FrameBase.Restyle(id) end
+    end
     -- our combat glow follows the player's combat state on every frame we style
     for _, st in pairs(VFS.Frames) do VFS.FrameBase.OnCombatChanged(st) end
   elseif event == "PLAYER_REGEN_DISABLED" then

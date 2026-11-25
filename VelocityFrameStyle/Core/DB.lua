@@ -35,7 +35,7 @@ DB.DEFAULT_GLOBAL = {
   barTexture = "Blizzard",        -- VFS_TextureKey (Core\Textures.lua built-ins + LibSharedMedia)
   font = "Friz Quadrata TT",      -- VFS_FontKey
   fontStyle = "OUTLINE",          -- "" | OUTLINE | THICKOUTLINE | MONOCHROME
-  backingAlpha = 0.6,             -- black backdrop behind every bar
+  backingAlpha = 0.3,             -- black inner surface; opaque border alpha is independent
   -- Geometric chrome (spec \u00a7Chrome): near-black disc + rounded plate; no Blizzard frame art, no border line
   plateColor = { 0.02, 0.02, 0.02 },   -- VFS_RGB
   plateAlpha = 0.9,
@@ -46,7 +46,6 @@ DB.DEFAULT_GLOBAL = {
   -- pet-target extras
   petTargetHideWhenSame = false,
   petTargetFlashOnNew = true,
-  petTargetScale = 0.8,
 }
 
 -- VFS_FrameSettings
@@ -77,12 +76,52 @@ function DB.Init()
     if type(db.frames[id].elements) ~= "table" or #db.frames[id].elements == 0 then db.frames[id].elements = DefaultElements() end
   end
   db.profiles = type(db.profiles) == "table" and db.profiles or {}
+  -- Adopt the owner's 30% surface baseline once. Subsequent options edits persist.
+  -- Only surface opacity changes; placements and text settings are untouched.
+  if not db.flatBarSurfaces then
+    db.global.backingAlpha = 0.3
+    for _, frame in pairs(db.frames) do
+      if frame.override then frame.override.backingAlpha = nil end
+    end
+    db.flatBarSurfaces = true
+  end
+  -- Removing pet-target zoom: preserve UIParent-relative anchor offsets at scale 1.
+  local oldScale = db.global.petTargetScale
+  if type(oldScale) == "number" and oldScale > 0 then
+    for _, profile in pairs(db.profiles) do
+      local p = profile.petTargetPlacement
+      if p and not p.anchorTo and type(p.x) == "number" and type(p.y) == "number" then
+        p.x, p.y = p.x * oldScale, p.y * oldScale
+      end
+    end
+    db.global.petTargetScale = nil
+  end
   VFS.db = db
 end
 
 function DB.Global() return VFS.db.global end
 function DB.Frame(id) return VFS.db.frames[id] end
 function DB.Elements(id) return VFS.db.frames[id].elements end
+
+-- Inner fill dimensions, not whole-frame zoom. Defaults stay in Chrome.LAYOUT.
+DB.DIMENSION_CONTROLS = {
+  { key = "barWidth", label = "Bar width", min = 40, max = 400 },
+  { key = "healthHeight", label = "Health height", min = 6, max = 80 },
+  { key = "powerHeight", label = "Power height", min = 6, max = 60 },
+}
+function DB.BarDimension(id, key)
+  local frame = DB.Frame(id)
+  local value = frame and frame.dimensions and frame.dimensions[key]
+  if value then return value end
+  local layout = VFS.Chrome.LAYOUT[id]
+  if key == "barWidth" then return layout.health.w end
+  return key == "healthHeight" and layout.health.h or layout.power.h
+end
+function DB.SetBarDimension(id, key, value)
+  local frame = DB.Frame(id)
+  frame.dimensions = frame.dimensions or {}
+  frame.dimensions[key] = math.floor(value + 0.5)
+end
 
 -- Effective value: the frame's override, else the theme.
 function DB.Effective(id, key)
@@ -104,7 +143,11 @@ end
 -- The active Edit Mode layout's record
 function DB.Profile()
   local p = VFS.LayoutProfile.Current()
-  Util.ApplyDefaults(p, DB.DEFAULT_PROFILE)
+  -- Placement is an atomic record: nil anchorTo deliberately means UIParent.
+  -- Deep-filling it restored PetFrame after every drag, immediately undoing the move.
+  if type(p.petTargetPlacement) ~= "table" then
+    p.petTargetPlacement = Util.DeepCopy(DB.DEFAULT_PLACEMENT)
+  end
   return p
 end
 

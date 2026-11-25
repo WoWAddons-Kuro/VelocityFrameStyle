@@ -17,7 +17,8 @@ function Options.Create()
   page = Widgets.Page("VelocityFrameStyleOptions", "Velocity Frame Style",
     "Restyles Blizzard's own unit frames and adds a pet-target frame. Text on every frame is a small grid of elements: "
     .. "choose where each one sits, its alignment, size and colour. Frames inherit the Theme below unless overridden. "
-    .. "Position and scale of Blizzard's frames are set in Edit Mode. " .. Client.EditModeHint())
+    .. "Set bar width and heights below; these do not zoom text, portraits or borders. "
+    .. "For consistent sizing, leave Blizzard's Edit Mode frame scale at 100%. " .. Client.EditModeHint())
   local content = page.content
 
   -- About

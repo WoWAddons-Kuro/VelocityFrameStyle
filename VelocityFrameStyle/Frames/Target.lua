@@ -11,7 +11,7 @@ local function PlaceBars(st)
   local L = Chrome.LAYOUT.target
   local hb, pb = FrameBase.Bar(st, "health"), FrameBase.Bar(st, "power")
   if hb then Geometry.PlaceBar("target", hb, { point = "RIGHT", relTo = st.button, relPoint = "RIGHT", x = -86, y = 6, width = L.health.w, height = L.health.h }) end
-  if pb and hb then Geometry.PlaceBar("target", pb, { point = "TOPRIGHT", relTo = hb, relPoint = "BOTTOMRIGHT", x = 2, y = -1, width = L.power.w, height = L.power.h }) end
+  if pb and hb then Geometry.PlaceBar("target", pb, { point = "TOPRIGHT", relTo = hb, relPoint = "BOTTOMRIGHT", x = 0, y = -FrameBase.BAR_BORDER_WIDTH, width = L.power.w, height = L.power.h }) end
 end
 
 local function PlaceSkull(st)

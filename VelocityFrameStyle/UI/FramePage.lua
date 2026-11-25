@@ -80,6 +80,14 @@ function FramePage.BuildFrameSection(content, id)
   local box = Widgets.Section(content, LABELS[id] or id)
   box:Add(Widgets.Check(box, "Enabled", "Restyle this frame.", function() return DB.Frame(id).enabled end,
     function(v) DB.Frame(id).enabled = v; Restyle(id) end), 26)
+  box:Add(Widgets.Text(box, "Bar dimensions only; text, portrait and borders do not zoom. Changes made in combat apply afterward."), 28)
+  for _, definition in ipairs(DB.DIMENSION_CONTROLS) do
+    local key = definition.key
+    box:Add(Widgets.Slider(box, definition.label, definition.min, definition.max, 1,
+      function() return DB.BarDimension(id, key) end,
+      function(v) DB.SetBarDimension(id, key, v); Restyle(id) end,
+      function(v) return string.format("%d UI px", v) end), 44, -10)
+  end
 
   -- Overrides
   box:Add(OverrideRow(box, id, "barTexture", "bar texture", function(h) return MediaPicker.Create(h, "statusbar", function() return DB.Effective(id, "barTexture") end, function(v) DB.Frame(id).override.barTexture = v; Restyle(id) end, 180) end), 26)
@@ -107,9 +115,6 @@ function FramePage.BuildFrameSection(content, id)
       function() return DB.Global().petTargetHideWhenSame end, function(v) DB.Global().petTargetHideWhenSame = v; VFS.PetTargetVisibility.ApplySoftHide() end), 26, -8)
     box:Add(Widgets.Check(box, "Flash when the pet picks a new target", nil,
       function() return DB.Global().petTargetFlashOnNew end, function(v) DB.Global().petTargetFlashOnNew = v end), 26)
-    box:Add(Widgets.Slider(box, "Scale", 0.5, 1.5, 0.05, function() return DB.Global().petTargetScale end,
-      function(v) DB.Global().petTargetScale = v; if not VFS.PetTarget.ApplyPlacement() then VFS.PetTargetVisibility.MarkPending() end end,
-      function(v) return string.format("%d%%", math.floor(v * 100 + 0.5)) end), 44, -10)
     box:Add(Widgets.Button(box, "Copy text layout from Target", function()
       DB.Frame("pettarget").elements = Util.DeepCopy(DB.Elements("target")); Restyle("pettarget"); Widgets.RefreshAll()
     end, 220), 22, -8)
