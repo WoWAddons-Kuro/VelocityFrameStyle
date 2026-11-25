@@ -76,7 +76,14 @@ function Chrome.Create(st)
   glowFrame:SetAllPoints(holder)
   glowFrame:SetFrameLevel(holder:GetFrameLevel() + 2)
   local gDisc = glowFrame:CreateTexture(nil, "ARTWORK"); gDisc:SetTexture(SOFT_DISC); gDisc:SetBlendMode("ADD")
-  local gPlate = glowFrame:CreateTexture(nil, "ARTWORK"); gPlate:SetTexture(ROUNDED_EDGE); gPlate:SetBlendMode("ADD")
+  -- The plate glow is a 9-SLICE edge ring (BackdropTemplate, edgeFile only), NOT a stretched texture: stretching the
+  -- 64x64 rounded square to plate size made its corners elliptical (owner 2026-11-25). 9-slice corners stay 12 px.
+  local gPlate = CreateFrame("Frame", nil, glowFrame, BackdropTemplateMixin and "BackdropTemplate" or nil)
+  gPlate:SetFrameLevel(glowFrame:GetFrameLevel())
+  if gPlate.SetBackdrop then
+    gPlate:SetBackdrop({ edgeFile = ROUNDED_EDGE, edgeSize = 12, insets = { left = 6, right = 6, top = 6, bottom = 6 } })
+  end
+  gPlate:EnableMouse(false)
   glowFrame:SetAlpha(0)
   local anim = glowFrame:CreateAnimationGroup()
   anim:SetLooping("BOUNCE")
@@ -138,7 +145,7 @@ function Chrome.ApplyColors(st)
   if c.plateSoft.SetBackdropColor then c.plateSoft:SetBackdropColor(r, g, b, a * 0.35); c.plateSoft:SetBackdropBorderColor(r, g, b, a * 0.35) end
   local gc = DB.Global().combatGlowColor or { 1, 0.1, 0.1 }
   c.glow.disc:SetVertexColor(gc[1], gc[2], gc[3], 0.7)
-  c.glow.plate:SetVertexColor(gc[1], gc[2], gc[3], 0.7)
+  if c.glow.plate.SetBackdropBorderColor then c.glow.plate:SetBackdropBorderColor(gc[1], gc[2], gc[3], 0.7) end
 end
 
 -- Combat glow: shown while the unit is in combat (same signal Blizzard's flash uses) -----------------------
