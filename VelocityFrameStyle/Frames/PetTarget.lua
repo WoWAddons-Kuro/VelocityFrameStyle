@@ -63,7 +63,10 @@ function PetTarget.Create()
   f.health:SetPoint("TOPRIGHT", -90, -45)
   f.health:SetMinMaxValues(0, 1); f.health:SetValue(1); f.health:EnableMouse(false)
 
+  -- Plain widget: TextStatusBar's Lua updater cannot compare secret capacities
+  -- when invoked by an addon. FrameBase queries resource presence instead.
   f.power = CreateFrame("StatusBar", nil, f)
+  f.power.unit = UNIT
   f.power:SetFrameLevel(f:GetFrameLevel() + 4)
   f.power:SetSize(119, 12)
   f.power:SetPoint("TOPRIGHT", -90, -56)

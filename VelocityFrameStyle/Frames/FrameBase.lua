@@ -63,7 +63,7 @@ function FrameBase.AcquireBackdrop(bar)
   local function Sync()
     h:SetFrameStrata(bar:GetFrameStrata()); h:SetFrameLevel(math.max(0, bar:GetFrameLevel() - 1))
     h.border:SetFrameLevel(h:GetFrameLevel())
-    ring:SetFrameStrata(bar:GetFrameStrata()); ring:SetFrameLevel(bar:GetFrameLevel() + 1)
+    ring:SetFrameStrata(bar:GetFrameStrata()); ring:SetFrameLevel(bar:GetFrameLevel() + (bar.vfsBorderLevelOffset or 1))
   end
   Sync()
   hooksecurefunc(bar, "SetFrameLevel", Sync)
@@ -184,15 +184,22 @@ function FrameBase.ApplyPortrait(st)
 end
 
 -- Appearance (cosmetic; legal in combat) ----------------------------------------------------------------
--- Collapse only when max power is a readable zero; empty resources still have
--- positive capacity. Secret/unknown capacities must not be compared or guessed.
+-- Target follows its native controller; our pet-target uses the client's explicit
+-- resource-presence query. Never run native Lua comparisons on secret capacity.
 function FrameBase.RefreshPowerVisibility(st)
   if st.id ~= "target" and st.id ~= "pettarget" then return false end
   local power = st.bars.power
   if not power then return false end
-  local preview = st.id == "pettarget" and VFS.PetTarget.IsSample()
-  local maxPower = Util.PlainNumber(UnitPowerMax(st.unit), nil)
-  local absent = DB.Frame(st.id).enabled and not preview and maxPower ~= nil and maxPower == 0
+  local absent = false
+  if DB.Frame(st.id).enabled then
+    if st.id == "pettarget" then
+      absent = not VFS.PetTarget.IsSample() and Client.HasPowerResource(st.unit) == false
+    else
+      -- IsShown is local to the bar: hiding the whole target frame is not
+      -- evidence of no resource. Do not use IsVisible here.
+      absent = not power.stock:IsShown()
+    end
+  end
   local changed = st.powerAbsent ~= absent
   st.powerAbsent = absent
   power.stock:SetAlpha(absent and 0 or 1)
@@ -207,6 +214,117 @@ function FrameBase.RefreshPowerVisibility(st)
   end
   if changed and VFS.Chrome then VFS.Chrome.Layout(st) end
   return changed
+end
+
+-- Prediction fills retain Blizzard's value-controlled FillMask. Only the extra
+-- fixed art-window mask is replaced with a rectangle bound to our resized bar.
+local function HasMask(texture, mask)
+  if not mask then return false end
+  for i = 1, texture:GetNumMaskTextures() do
+    if texture:GetMaskTexture(i) == mask then return true end
+  end
+  return false
+end
+
+local function StylePrediction(st, entry)
+  local bar, segment = entry.bar, entry.segment
+  local fill = segment and segment.Fill
+  if not bar or not fill or not segment.FillMask or not fill.GetNumMaskTextures then return false end
+  local enabled = DB.Frame(st.id).enabled
+  local saved = segment.vfsPredictionStyle
+  if not enabled and not saved then return true end
+  if not saved then
+    saved = { atlas = fill:GetAtlas(), texture = fill:GetTexture(), coords = { fill:GetTexCoord() },
+      nativeColor = { fill:GetVertexColor() },
+      fillAlpha = fill:GetAlpha(), segmentAlpha = segment:GetAlpha(), blendMode = fill:GetBlendMode(),
+      levelOffset = segment:GetFrameLevel() - bar:GetFrameLevel(), active = false }
+    segment.vfsPredictionStyle = saved
+    saved.clip = segment:CreateMaskTexture(nil, "OVERLAY")
+    saved.clip:SetTexture("Interface\\Buttons\\WHITE8x8", "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
+    saved.clip:SetAllPoints(bar)
+    local function Sync()
+      Util.Safe("prediction:" .. st.id .. ":" .. entry.key, StylePrediction, st, entry)
+    end
+    if segment.UpdateFillPosition then hooksecurefunc(segment, "UpdateFillPosition", Sync) end
+    if segment.SetFillColor then
+      hooksecurefunc(segment, "SetFillColor", function()
+        saved.nativeColor = { fill:GetVertexColor() }
+        Sync()
+      end)
+    end
+    hooksecurefunc(bar, "SetFrameLevel", Sync)
+    hooksecurefunc(bar, "SetFrameStrata", Sync)
+  end
+  if enabled then
+    if HasMask(fill, entry.artMask) then
+      fill:RemoveMaskTexture(entry.artMask)
+      saved.removedArtMask = entry.artMask
+    end
+    if not HasMask(fill, saved.clip) then fill:AddMaskTexture(saved.clip) end
+    -- Diagnostic control: BantoBar fades to RGB 69/255 on the right, so tinting
+    -- its full-width texture yellow yields an olive slice under the FillMask.
+    -- Keep main bars unchanged; use white here to isolate that pixel shading.
+    fill:SetTexture("Interface\\Buttons\\WHITE8x8")
+    fill:SetVertexColor(1, 0.9, 0.1, 1)
+    -- Vertex alpha alone does not override native texture/frame opacity.
+    fill:SetAlpha(1)
+    segment:SetAlpha(1)
+    fill:SetBlendMode("BLEND")
+    fill:SetTexCoord(0, 1, 0, 1)
+    fill:ClearAllPoints(); fill:SetAllPoints(bar)
+    segment:SetFrameStrata(bar:GetFrameStrata())
+    segment:SetFrameLevel(bar:GetFrameLevel() + 1)
+    bar.vfsBorderLevelOffset = 2
+    if bar.vfsBackdrop then bar.vfsBackdrop.ring:SetFrameLevel(bar:GetFrameLevel() + 2) end
+    st.host.top:SetFrameLevel(math.max(st.host.top:GetFrameLevel(), bar:GetFrameLevel() + 3))
+    saved.active = true
+  elseif saved.active then
+    if HasMask(fill, saved.clip) then fill:RemoveMaskTexture(saved.clip) end
+    if saved.removedArtMask and not HasMask(fill, saved.removedArtMask) then fill:AddMaskTexture(saved.removedArtMask) end
+    if saved.atlas then fill:SetAtlas(saved.atlas, false) else fill:SetTexture(saved.texture) end
+    fill:SetTexCoord(unpack(saved.coords))
+    fill:SetVertexColor(unpack(saved.nativeColor))
+    fill:SetAlpha(saved.fillAlpha)
+    segment:SetAlpha(saved.segmentAlpha)
+    fill:SetBlendMode(saved.blendMode)
+    fill:ClearAllPoints(); fill:SetAllPoints(segment)
+    segment:SetFrameLevel(bar:GetFrameLevel() + saved.levelOffset)
+    bar.vfsBorderLevelOffset = nil
+    if bar.vfsBackdrop then bar.vfsBackdrop.ring:SetFrameLevel(bar:GetFrameLevel() + 1) end
+    saved.active = false
+  end
+  return true
+end
+
+function FrameBase.ApplyPredictions(st)
+  for _, entry in ipairs(Client.PredictionSegments(st.id)) do
+    local ok, supported = pcall(StylePrediction, st, entry)
+    VFS.features["prediction:" .. st.id .. ":" .. entry.key] = ok and supported or false
+    if not ok then Util.WarnOnce("prediction:" .. st.id .. ":" .. entry.key, tostring(supported)) end
+  end
+end
+
+-- Stock status/threat art can reset its alpha every frame (notably Player's
+-- StatusTexture). Gate ONLY ChromeRegions, never keep-list or prediction regions.
+-- Save native alpha writes so disabling styling restores the intended opacity.
+function FrameBase.SetChromeSuppressed(region, id, suppressed)
+  local state = region.vfsChromeAlphaState
+  if not state then
+    state = { nativeAlpha = region:GetAlpha(), setting = false }
+    region.vfsChromeAlphaState = state
+    hooksecurefunc(region, "SetAlpha", function(_, alpha)
+      if state.setting then return end
+      state.nativeAlpha = alpha -- may be secret: store/pass through only
+      if DB.Frame(id).enabled then
+        state.setting = true
+        region:SetAlpha(0)
+        state.setting = false
+      end
+    end)
+  end
+  state.setting = true
+  if suppressed then region:SetAlpha(0) else region:SetAlpha(state.nativeAlpha) end
+  state.setting = false
 end
 
 function FrameBase.ApplyAppearance(st)
@@ -233,8 +351,8 @@ function FrameBase.ApplyAppearance(st)
   local a = enabled and 0 or 1
   for _, r in ipairs(Client.ChromeRegions(id)) do
     if r.GetObjectType and r:GetObjectType() == "StatusBar" then
-      for i = 1, select("#", r:GetRegions()) do local t = select(i, r:GetRegions()); if t.SetAlpha then t:SetAlpha(a) end end
-    elseif r.SetAlpha then r:SetAlpha(a) end
+      for i = 1, select("#", r:GetRegions()) do local t = select(i, r:GetRegions()); if t.SetAlpha then FrameBase.SetChromeSuppressed(t, id, enabled) end end
+    elseif r.SetAlpha then FrameBase.SetChromeSuppressed(r, id, enabled) end
   end
   FrameBase.ApplyPortrait(st)
   -- Stock texts: alpha 0 while we draw our own (adopted value strings are ours now and are skipped)
@@ -249,6 +367,7 @@ function FrameBase.ApplyAppearance(st)
   TextLayout.PruneTexts(st.host, elements)
   if not enabled then for _, t in pairs(st.host.text) do if not t.vfsAdopted then t:Hide() end end end
   FrameBase.RefreshPowerVisibility(st)
+  FrameBase.ApplyPredictions(st)
   if VFS.Chrome then VFS.Chrome.SetShown(st, enabled); VFS.Chrome.Layout(st); VFS.Chrome.ApplyColors(st); VFS.Chrome.UpdateCombat(st) end
 end
 
@@ -282,6 +401,11 @@ function FrameBase.HookCommon(st)
   st.hooked = true
   Client.HookBarUpdate(st.id, "health", function() FrameBase.ApplyHealthTexts(st) end)
   Client.HookBarUpdate(st.id, "power", function() FrameBase.ApplyPowerTexts(st) end)
+  if st.id == "target" and st.bars.power then
+    local function SyncPowerVisibility() FrameBase.ApplyTexts(st) end
+    st.bars.power.stock:HookScript("OnShow", SyncPowerVisibility)
+    st.bars.power.stock:HookScript("OnHide", SyncPowerVisibility)
+  end
   st.button:HookScript("OnShow", function() FrameBase.ApplyAppearance(st); FrameBase.ApplyTexts(st) end)
   if not FrameBase.portraitHooked and UnitFramePortrait_Update then
     FrameBase.portraitHooked = true

@@ -156,6 +156,115 @@ local function DumpLayers(id)
   Util.DumpFooter("/vfs layers " .. id)
 end
 
+-- Read-only: distinguish secret capacity from stale/independent power visuals.
+local function DumpPower(id)
+  local st = VFS.Frames[id]
+  if not st or not st.bars.power then Util.Print("no power bar for %s", tostring(id)); return end
+  local bar = st.bars.power
+  local function S(v)
+    if Util.IsSecret(v) then return "<secret>" end
+    return tostring(v)
+  end
+  local maximum = UnitPowerMax(st.unit)
+  local plain = Util.PlainNumber(maximum, nil)
+  local powerType, token = UnitPowerType(st.unit)
+  local low, high = bar.stock:GetMinMaxValues()
+  Util.DumpHeader("/vfs power " .. id)
+  Util.Print("unit=%s exists=%s type=%s token=%s", st.unit, S(UnitExists(st.unit)), S(powerType), S(token))
+  if UnitHasPowerType and not Util.IsSecret(powerType) then
+    local ok, present = pcall(UnitHasPowerType, st.unit, powerType)
+    Util.Print("UnitHasPowerType ok=%s result=%s | client presence=%s", tostring(ok), S(present), S(Client.HasPowerResource(st.unit)))
+  end
+  Util.Print("current=%s max=%s maxSecret=%s plainMax=%s", S(UnitPower(st.unit)), S(maximum),
+    tostring(Util.IsSecret(maximum)), tostring(plain))
+  Util.Print("stock shown=%s visible=%s alpha=%s range=%s..%s", S(bar.stock:IsShown()),
+    S(bar.stock:IsVisible()), S(bar.stock:GetAlpha()), S(low), S(high))
+  Util.Print("stock controlsShownState=%s alwaysShow=%s pauseUpdates=%s", S(bar.stock.controlsShownState),
+    S(bar.stock.alwaysShow), S(bar.stock.pauseUpdates))
+  Util.Print("VFS powerAbsent=%s slotPresent=%s backingShown=%s backingAlpha=%s borderAlpha=%s",
+    S(st.powerAbsent), tostring(st.slots.power ~= nil), S(bar.backdrop:IsShown()),
+    S(bar.backdrop:GetAlpha()), S(bar.backdrop.ring:GetAlpha()))
+  local text = st.host.text.power
+  if text then
+    Util.Print("text shown=%s alpha=%s layoutVisible=%s", S(text:IsShown()), S(text:GetAlpha()), S(text.vfsVisible))
+  end
+  Util.DumpFooter("/vfs power " .. id)
+end
+
+local powerComparePanel
+local function ComparePower()
+  if not powerComparePanel then
+    local panel = CreateFrame("Frame", nil, UIParent)
+    panel:SetSize(460, 300); panel:SetPoint("CENTER"); panel:SetFrameStrata("DIALOG")
+    local bg = panel:CreateTexture(nil, "BACKGROUND"); bg:SetAllPoints(); bg:SetColorTexture(0, 0, 0, 0.95)
+    local title = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    title:SetPoint("TOPLEFT", 12, -12); title:SetText("Power comparison (snapshot; rerun to refresh)")
+    local close = CreateFrame("Button", nil, panel, "UIPanelCloseButton")
+    close:SetPoint("TOPRIGHT"); close:SetScript("OnClick", function() panel:Hide() end)
+    panel.rows = {}
+    for i = 1, 10 do
+      local label = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+      label:SetPoint("TOPLEFT", 12, -42 - (i-1)*23)
+      local value = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+      value:SetPoint("TOPRIGHT", -18, -42 - (i-1)*23)
+      panel.rows[i] = { label = label, value = value }
+    end
+    powerComparePanel = panel
+  end
+  local row = 0
+  local function Add(label, value)
+    row = row + 1
+    local r = powerComparePanel.rows[row]
+    r.label:SetText(label)
+    -- Direct widget sink only: no comparison, tostring, arithmetic or chat logging.
+    r.value:SetText(value)
+  end
+  for _, id in ipairs({ "target", "pettarget" }) do
+    local st = VFS.Frames[id]
+    local bar = st and st.bars.power and st.bars.power.stock
+    if bar then
+      local low, high = bar:GetMinMaxValues()
+      local powerType = UnitPowerType(st.unit)
+      Add(id .. " API max (default type)", UnitPowerMax(st.unit))
+      Add(id .. " API max (explicit type)", UnitPowerMax(st.unit, powerType))
+      Add(id .. " widget minimum", low)
+      Add(id .. " widget maximum", high)
+      Add(id .. " widget current", bar:GetValue())
+      Util.Print("%s TextString=%s nativeUpdater=%s", id, tostring(bar.TextString ~= nil),
+        tostring(TextStatusBarMixin and bar.UpdateTextString == TextStatusBarMixin.UpdateTextString))
+    else
+      for i = 1, 5 do Add(id .. " unavailable", "-") end
+    end
+  end
+  powerComparePanel:Show()
+end
+
+local function DumpPredictions()
+  local function S(v) if Util.IsSecret(v) then return "<secret>" end return tostring(v) end
+  Util.DumpHeader("/vfs predictions player")
+  Util.Print("selected texture: %s", Util.StatusBarPath(DB.Effective("player", "barTexture")))
+  for _, entry in ipairs(Client.PredictionSegments("player")) do
+    local segment = entry.segment
+    local fill = segment and segment.Fill
+    if fill then
+      local r, g, b, a = fill:GetVertexColor()
+      Util.Print("%s styled=%s shown=%s level=%s fillAlpha=%s rgba=%s,%s,%s,%s blend=%s", entry.key,
+        tostring(segment.vfsPredictionStyle and segment.vfsPredictionStyle.active), S(segment:IsShown()),
+        S(segment:GetFrameLevel()), S(fill:GetAlpha()), S(r), S(g), S(b), S(a), S(fill:GetBlendMode()))
+      Util.Print("texture=%s atlas=%s masks=%s", S(fill:GetTexture()), S(fill:GetAtlas()), S(fill:GetNumMaskTextures()))
+      local parent = fill:GetParent()
+      for depth = 1, 4 do
+        if not parent then break end
+        Util.Print("  parent%d %s alpha=%s", depth, parent:GetName() or "anonymous", S(parent:GetAlpha()))
+        parent = parent:GetParent()
+      end
+    else
+      Util.Print("%s MISSING", entry.key)
+    end
+  end
+  Util.DumpFooter("/vfs predictions player")
+end
+
 local function Slash(msg)
   msg = (msg or ""):lower():match("^%s*(.-)%s*$")
   local cmd, arg = msg:match("^(%S+)%s*(%S*)$")
@@ -174,6 +283,14 @@ local function Slash(msg)
   elseif cmd == "text" then DumpText(arg ~= "" and arg or "player")
   elseif cmd == "rects" then DumpRects(arg ~= "" and arg or "player")
   elseif cmd == "values" then DumpValues(arg ~= "" and arg or "player")
+  elseif cmd == "power" then DumpPower(arg ~= "" and arg or "target")
+  elseif msg == "powercompare" then ComparePower()
+  elseif cmd == "predictions" then
+    local delay = tonumber(arg) or 0
+    if delay > 0 then
+      Util.Print("Prediction snapshot in %.1f seconds; start casting now.", math.min(delay, 10))
+      C_Timer.After(math.min(delay, 10), DumpPredictions)
+    else DumpPredictions() end
   elseif cmd == "layers" then DumpLayers(arg ~= "" and arg or "player")
   elseif msg == "editmode" or msg == "edit" then VFS.EditMode.Open()
   elseif msg == "restyle" then VFS.FrameBase.RestyleAll(); Util.Print("restyled")

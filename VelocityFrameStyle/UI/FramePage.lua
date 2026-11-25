@@ -7,7 +7,7 @@ local Util, DB, Widgets, MediaPicker, Format = VFS.Util, VFS.DB, VFS.Widgets, VF
 local FramePage = {}
 VFS.FramePage = FramePage
 
-local LABELS = { player = "Player", target = "Target", pet = "Pet", pettarget = "Pet Target" }
+local LABELS = { player = "Player", target = "Target", pet = "Pet", pettarget = "Pet Target", tot = "Target of Target" }
 FramePage.LABELS = LABELS
 
 local ANCHORS = { { "nameplate", "Name row" }, { "health", "Health bar" }, { "power", "Power bar" }, { "above", "Above" }, { "below", "Below" }, { "hidden", "Hidden" } }

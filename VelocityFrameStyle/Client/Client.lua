@@ -23,6 +23,7 @@ Client.INTERFACE = {
   -- Regions (nil = this client has no such region; the feature degrades to stock) -------------
   "HealthBar",            -- (frameID) -> StatusBar|nil
   "PowerBar",             -- (frameID) -> StatusBar|nil
+  "PredictionSegments",   -- (frameID) -> { {key, kind, bar, segment, artMask}, ... }; only audited native regions
   "ChromeRegions",        -- (frameID) -> { Region, ... } every Blizzard art region we alpha-zero: frame texture, flash,
                           --                                status glow, level circle, reaction strip, container background, loss bars
   "KeepRegions",          -- (frameID) -> { Region, ... } Blizzard art that STAYS visible (spec keep-list): rest zzz,
@@ -40,6 +41,7 @@ Client.INTERFACE = {
                           --   secret-value clients our health/power elements ADOPT it (its content is secure-written),
                           --   re-anchored and re-fonted. nil on clients where we compute the number ourselves.
   "HookBarUpdate",        -- (frameID, kind, fn) register fn(stockBar) after Blizzard updates that bar's value
+  "HasPowerResource",    -- (unit) -> true|false|nil; resource presence, not whether current power is nonzero
   -- Values ------------------------------------------------------------------------------------
   "UnitDisplayName",      -- (unit) -> string      two-name aware (PROJECT_STRUCTURE two-names rule)
   "FormatBarValue",       -- (unit, health|power, current|current_max|percent) -> text (possibly secret), available boolean

@@ -85,8 +85,13 @@ assert(ns.DB.Profile().petTargetPlacement.x == 123)
 -- Reload with the real Util/DB tables captured for visibility policy tests.
 assert(loadfile('VelocityFrameStyle/Frames/FrameBase.lua'))('VelocityFrameStyle', ns)
 function methods:SetAlpha(value) self.alpha = value end
+function methods:IsShown() return self.shown ~= false end
 local capacity = 0
-function UnitPowerMax() return capacity end
+ns.Client.HasPowerResource = function()
+  if capacity == nil then return nil end
+  return capacity > 0
+end
+function UnitPowerMax() error('Visibility must follow the controller, not inspect capacity') end
 local preview = false
 ns.PetTarget = { IsSample = function() return preview end }
 for _, id in ipairs({'target', 'pettarget'}) do
@@ -95,17 +100,26 @@ for _, id in ipairs({'target', 'pettarget'}) do
   local health = region()
   local st = {id=id, unit=id, bars={power=power, health={stock=health}}, slots={}}
   capacity = 0
+  power.stock.shown = false
   ns.FrameBase.RefreshPowerVisibility(st)
   assert(st.powerAbsent and power.stock.alpha == 0 and power.backdrop.alpha == 0)
   assert(power.backdrop.ring.alpha == 0 and st.slots.power == nil and st.slots.below == health)
   capacity = 100 -- even if current power is zero, capacity means the bar remains
+  power.stock.shown = true
   ns.FrameBase.RefreshPowerVisibility(st)
   assert(not st.powerAbsent and power.stock.alpha == 1 and st.slots.power == power.stock)
   capacity = nil -- unknown/secret is not evidence of no resource
   ns.FrameBase.RefreshPowerVisibility(st)
   assert(not st.powerAbsent)
+  if id == 'target' then
+    power.stock.shown = false
+    ns.FrameBase.RefreshPowerVisibility(st)
+    assert(st.powerAbsent and power.backdrop.alpha == 0 and power.backdrop.ring.alpha == 0,
+      'native hidden bar must collapse even with unreadable capacity')
+    power.stock.shown = true
+  end
   if id == 'pettarget' then
-    capacity = 0; preview = true; ns.FrameBase.RefreshPowerVisibility(st)
+    power.stock.shown = false; preview = true; ns.FrameBase.RefreshPowerVisibility(st)
     assert(not st.powerAbsent, 'Edit Mode retains sample power')
   end
 end

@@ -56,7 +56,7 @@ local function DefaultFrame()
   }
 end
 
-DB.FRAME_IDS = { "player", "target", "pet", "pettarget" }   -- VFS_FrameID, M0 set
+DB.FRAME_IDS = { "player", "target", "pet", "pettarget", "tot" }   -- every frame module needs a settings record
 
 -- VFS_Placement for the pet-target frame (anchorTo = "PetFrame" is the un-moved default; LibEditMode clears it)
 DB.DEFAULT_PLACEMENT = { anchorTo = "PetFrame", point = "LEFT", relPoint = "RIGHT", x = 8, y = 0 }

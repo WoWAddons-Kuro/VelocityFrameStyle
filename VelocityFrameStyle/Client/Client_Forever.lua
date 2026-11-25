@@ -46,6 +46,17 @@ VFS.ClientFlavours.forever = {
   HasBossFrames = function() return Boss1TargetFrame ~= nil end,
   HasSecretValues = function() return true end,
   EditModeHint = function() return "Right-click your portrait and choose Edit Mode, or press Escape > Edit Mode." end,
+  PredictionSegments = function(id)
+    if id ~= "player" then return {} end -- first pass: player mana cost and incoming healing
+    local container = P(PlayerMain(), "HealthBarsContainer")
+    local health = container and container.HealthBar
+    local power = P(PlayerMain(), "ManaBarArea.ManaBar")
+    return {
+      { key = "myHeal", kind = "health", bar = health, segment = health and health.MyHealPredictionBar, artMask = container and container.HealthBarMask },
+      { key = "otherHeal", kind = "health", bar = health, segment = health and health.OtherHealPredictionBar, artMask = container and container.HealthBarMask },
+      { key = "manaCost", kind = "power", bar = power, segment = power and power.ManaCostPredictionBar, artMask = power and power.ManaBarMask },
+    }
+  end,
 
   UnitButton = Root,
   Unit = function(id) return UNITS[id] end,
@@ -164,6 +175,18 @@ VFS.ClientFlavours.forever = {
     if id == "target" then return kind == "health" and P(TargetMain(), "HealthBarsContainer.HealthBarText") or P(TargetMain(), "ManaBar.ManaBarText") end
     if id == "pet" then return kind == "health" and PetFrameHealthBarText or PetFrameManaBarText end
     return nil   -- pettarget: our own frame, values are ours
+  end,
+  HasPowerResource = function(unit)
+    local powerType = Util.PlainNumber(UnitPowerType(unit), nil)
+    if UnitHasPowerType and powerType then
+      local ok, hasPower = pcall(UnitHasPowerType, unit, powerType)
+      if ok and not Util.IsSecret(hasPower) and type(hasPower) == "boolean" then return hasPower end
+    end
+    -- Older client builds may lack the presence API. Only use readable capacity;
+    -- never feed secrets to the generic Lua TextStatusBar updater.
+    local maximum = Util.PlainNumber(UnitPowerMax(unit), nil)
+    if maximum ~= nil then return maximum > 0 end
+    return nil
   end,
   HookBarUpdate = function(id, kind, fn)
     local bar = (kind == "health") and VFS.Client.HealthBar(id) or VFS.Client.PowerBar(id)

@@ -27,6 +27,7 @@ VFS.ClientFlavours.classic_era = {
   HasFocusFrame = function() return false end,
   HasBossFrames = function() return Boss1TargetFrame ~= nil end,
   HasSecretValues = function() return false end,
+  PredictionSegments = function() return {} end, -- Era prediction adaptation is not yet audited
   EditModeHint = function() return "Press Escape and choose Edit Mode from the game menu." end,
 
   UnitButton = Root,
@@ -110,6 +111,7 @@ VFS.ClientFlavours.classic_era = {
   end,
   -- Era: no secret values; the grid computes [hp]/[power] itself, so there is no stock string to adopt.
   StockValueText = function() return nil end,
+  HasPowerResource = function(unit) return UnitPowerMax(unit) > 0 end,
   HookBarUpdate = function(id, kind, fn)
     local bar = (kind == "health") and VFS.Client.HealthBar(id) or VFS.Client.PowerBar(id)
     Client.CommonHookBarUpdate(bar, fn)
