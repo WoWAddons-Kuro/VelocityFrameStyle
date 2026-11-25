@@ -127,6 +127,9 @@ Last round set power width = health width (113) on all frames and dropped EF's w
 
 ## Feature: text template — Name / Level / Health / Power rows + Format column [D, owner 2026-11-25]
 
+**Superseded implementation details:** see `03_Text_Template.md`. Installed Forever EasyFrames confirms direct Blizzard formatting APIs support independent per-bar text. The CVar mapping below was incorrect; no CVar writes are needed. Four-row UI and migration goals remain.
+
+
 **Replaces** the current six fixed rows (`name, level, health, healthpct, power, powerpct`) with **four**:
 
 | id | label | default anchor | align | size | colour | Format (new column) |

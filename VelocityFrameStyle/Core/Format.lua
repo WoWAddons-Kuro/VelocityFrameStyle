@@ -13,6 +13,22 @@ local Plain = Util.Plain
 local Format = {}
 VFS.Format = Format
 
+Format.VALUE_FORMATS = { { "current", "Current" }, { "current_max", "Current / Max" }, { "percent", "Percent" } }
+Format.FORMAT_TOKENS = {
+  health = { current = "[hp]", current_max = "[hp] / [hpmax]", percent = "[hp%]" },
+  power = { current = "[power]", current_max = "[power] / [powermax]", percent = "[power%]" },
+}
+function Format.SetValueFormat(element, mode)
+  local tokens = Format.FORMAT_TOKENS[element.id]
+  if not tokens or not tokens[mode] then return end
+  element.valueFormat, element.format = mode, tokens[mode]
+end
+function Format.SampleValue(kind, mode)
+  local values = kind == "health" and { current = "1500", current_max = "1500 / 2000", percent = "75%" }
+    or { current = "400", current_max = "400 / 1000", percent = "40%" }
+  return values[mode] or values.current
+end
+
 Format.TOKENS = { "[name]", "[level]", "[hp]", "[hp%]", "[hpmax]", "[power]", "[power%]", "[powermax]", "[class]", "[class+]", "[creature]" }
 Format.SKULL_TEXT = "??"
 Format.SKULL_ICON = "|TInterface\\TargetingFrame\\UI-TargetingFrame-Skull:0|t"

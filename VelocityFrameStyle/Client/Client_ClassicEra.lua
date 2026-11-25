@@ -117,6 +117,13 @@ VFS.ClientFlavours.classic_era = {
 
   UnitDisplayName = function(unit) return UnitName(unit) or "" end,
   HealthValues = Client.CommonHealth,
+  FormatBarValue = function(unit, kind, mode)
+    local tokens = VFS.Format.FORMAT_TOKENS[kind]
+    local text = VFS.Format.ExpandOrEmpty(tokens[mode] or tokens.current, unit)
+    local maximum = kind == "health" and UnitHealthMax(unit) or UnitPowerMax(unit)
+    if kind == "power" and maximum <= 0 then return "", false end
+    return text, text ~= ""
+  end,
   PowerValues = Client.CommonPower,
   UnitIsSameUnit = function(a, b) return UnitIsUnit(a, b) == true end,
   DifficultyColor = Client.CommonDifficultyColor,

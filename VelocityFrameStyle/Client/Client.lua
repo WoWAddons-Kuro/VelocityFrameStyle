@@ -42,6 +42,7 @@ Client.INTERFACE = {
   "HookBarUpdate",        -- (frameID, kind, fn) register fn(stockBar) after Blizzard updates that bar's value
   -- Values ------------------------------------------------------------------------------------
   "UnitDisplayName",      -- (unit) -> string      two-name aware (PROJECT_STRUCTURE two-names rule)
+  "FormatBarValue",       -- (unit, health|power, current|current_max|percent) -> text (possibly secret), available boolean
   "HealthValues",         -- (unit) -> cur|nil, max|nil, pct|nil
   "PowerValues",          -- (unit) -> cur|nil, max|nil, pct|nil, token|nil
   "UnitIsSameUnit",       -- (a, b) -> true|false|nil (nil = secret)

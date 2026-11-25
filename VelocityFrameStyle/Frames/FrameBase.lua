@@ -142,11 +142,8 @@ function FrameBase.Acquire(id)
   st.host = TextLayout.CreateHost(button, 1)
   st.host.top:SetFrameStrata(button:GetFrameStrata())
   st.host.top:SetFrameLevel(top + 3)
-  -- Secret-value clients: health/power elements adopt Blizzard's secure value strings
-  if Client.HasSecretValues() then
-    TextLayout.AdoptStock(st.host, "health", Client.StockValueText(id, "health"))
-    TextLayout.AdoptStock(st.host, "power",  Client.StockValueText(id, "power"))
-  end
+  -- Own value strings on both clients. The client formatter handles secret values
+  -- through Blizzard's APIs, independently of the global status-text setting.
   VFS.Frames[id] = st
   if VFS.Chrome then VFS.Chrome.Create(st) end
   return st

@@ -44,17 +44,23 @@ end
 local function ElementRow(box, id, index)
   local row = CreateFrame("Frame", nil, box); row:SetSize(Widgets.BOX_W - 2 * Widgets.PAD, 26)
   local function E() return DB.Elements(id)[index] end
-  row.label = row:CreateFontString(nil, "ARTWORK", "GameFontHighlight"); row.label:SetPoint("LEFT", 6, 0); row.label:SetWidth(80); row.label:SetJustifyH("LEFT")
-  local anchor = Widgets.Dropdown(row, ANCHORS, function() return E() and E().anchor end, function(v) if E() then E().anchor = v; Restyle(id) end end, 95)
-  anchor:SetPoint("LEFT", row.label, "RIGHT", -10, -2)
-  local align = Widgets.Dropdown(row, ALIGNS, function() return E() and E().align end, function(v) if E() then E().align = v; Restyle(id) end end, 70)
-  align:SetPoint("LEFT", anchor, "RIGHT", -20, 0)
-  local size = Widgets.Dropdown(row, SIZES, function() return E() and E().size end, function(v) if E() then E().size = v; Restyle(id) end end, 45)
-  size:SetPoint("LEFT", align, "RIGHT", -20, 0)
-  local color = Widgets.Dropdown(row, COLORS, function() return E() and E().color end, function(v) if E() then E().color = v; Restyle(id) end end, 85)
-  color:SetPoint("LEFT", size, "RIGHT", -20, 0)
+  row.label = row:CreateFontString(nil, "ARTWORK", "GameFontHighlight"); row.label:SetPoint("LEFT", 6, 0); row.label:SetWidth(60); row.label:SetJustifyH("LEFT")
+  local anchor = Widgets.Dropdown(row, ANCHORS, function() return E() and E().anchor end, function(v) if E() then E().anchor = v; Restyle(id) end end, 85)
+  anchor:SetPoint("LEFT", row, "LEFT", 55, -2)
+  local align = Widgets.Dropdown(row, ALIGNS, function() return E() and E().align end, function(v) if E() then E().align = v; Restyle(id) end end, 55)
+  align:SetPoint("LEFT", row, "LEFT", 165, -2)
+  local size = Widgets.Dropdown(row, SIZES, function() return E() and E().size end, function(v) if E() then E().size = v; Restyle(id) end end, 40)
+  size:SetPoint("LEFT", row, "LEFT", 245, -2)
+  local color = Widgets.Dropdown(row, COLORS, function() return E() and E().color end, function(v) if E() then E().color = v; Restyle(id) end end, 65)
+  color:SetPoint("LEFT", row, "LEFT", 310, -2)
+  local valueFormat = Widgets.Dropdown(row, Format.VALUE_FORMATS,
+    function() return E() and E().valueFormat or "current" end,
+    function(v)
+      if E() then Format.SetValueFormat(E(), v); Restyle(id) end
+    end, 95)
+  valueFormat:SetPoint("LEFT", row, "LEFT", 425, -2)
   -- custom colour swatch, visible only in custom mode
-  row.swatch = CreateFrame("Button", nil, row); row.swatch:SetSize(16, 16); row.swatch:SetPoint("LEFT", color, "RIGHT", -8, 2)
+  row.swatch = CreateFrame("Button", nil, row); row.swatch:SetSize(16, 16); row.swatch:SetPoint("LEFT", row, "LEFT", 410, 0)
   row.swatch.tex = row.swatch:CreateTexture(nil, "ARTWORK"); row.swatch.tex:SetAllPoints(); row.swatch.tex:SetColorTexture(1, 1, 1)
   row.swatch:SetScript("OnClick", function()
     local e = E(); if not e then return end
@@ -68,6 +74,7 @@ local function ElementRow(box, id, index)
     row:SetShown(e ~= nil)
     if not e then return end
     row.label:SetText(e.label or e.id)
+    valueFormat:SetShown(e.id == "health" or e.id == "power")
     local c = e.customColor or { 1, 1, 1 }
     row.swatch.tex:SetColorTexture(c[1], c[2], c[3])
     row.swatch:SetShown(e.color == "custom")
@@ -95,17 +102,17 @@ function FramePage.BuildFrameSection(content, id)
   box:Add(OverrideRow(box, id, "backingAlpha", "bar background", function(h)
     local s = Widgets.Slider(h, "Background", 0, 1, 0.05, function() return DB.Effective(id, "backingAlpha") end, function(v) DB.Frame(id).override.backingAlpha = v; Restyle(id) end, function(v) return string.format("%d%%", math.floor(v * 100 + 0.5)) end)
     s:SetSize(260, 44); return s end), 44)
-  box:Add(OverrideRow(box, id, "borderDarken", "border brightness", function(h)
-    local s = Widgets.Slider(h, "Border", 0, 1, 0.05, function() return DB.Effective(id, "borderDarken") end, function(v) DB.Frame(id).override.borderDarken = v; Restyle(id) end, function(v) return string.format("%d%%", math.floor(v * 100 + 0.5)) end)
-    s:SetSize(260, 44); return s end), 44)
 
   -- Text grid
   local hdr = box:CreateFontString(nil, "ARTWORK", "GameFontNormal"); hdr:SetText("Text")
   box:Add(hdr, 14, -10)
-  local cols = box:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
-  cols:SetText("Element                 Position                 Align            Size        Colour")
-  box:Add(cols, 12, -2, 6)
-  local maxRows = #DB.DefaultElements() + 4   -- room for a few custom elements (M2)
+  local cols = CreateFrame("Frame", nil, box); cols:SetSize(560, 14)
+  for _, column in ipairs({ {"Element",6}, {"Position",75}, {"Align",185}, {"Size",265}, {"Colour",330}, {"Format",445} }) do
+    local label = cols:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+    label:SetPoint("LEFT", column[2], 0); label:SetText(column[1])
+  end
+  box:Add(cols, 14, -2)
+  local maxRows = #DB.DefaultElements()
   for i = 1, maxRows do box:Add(ElementRow(box, id, i), 26, -2) end
 
   -- Frame extras

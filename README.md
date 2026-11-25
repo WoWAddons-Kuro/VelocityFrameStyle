@@ -3,9 +3,10 @@
 Restyles Blizzard's **own** unit frames (player, target, pet) and adds the one frame Classic never had: your **pet's target**.
 Works on Classic Era and WoW Forever from a single addon.
 
-- **Text is a small grid.** Every frame has the same rows (Name, Level, Health, Health %, Power, Power %): pick where
-  each sits (name row / health bar / power bar / above / below / hidden), its alignment, size and colour. No format
-  strings, no abbreviation formulas. Values that the game hides (Forever secret values) simply leave the element blank.
+- **Text is a small grid.** Four rows: Name, Level, Health and Power. Pick position, alignment, size and colour.
+  Health and Power each offer **Current**, **Current / Max**, or **Percent**; use Position = Hidden to hide a row.
+  Formats are independent per bar and frame, including Forever. Forever uses Blizzard's secret-safe formatting APIs;
+  the game's global Status Text setting is not changed.
 - **Theme + overrides.** Bar texture, font, bar background, border brightness and portrait style are set once and
   inherited by every frame; any frame can override any of them.
 - **Visual pickers.** The bar-texture and font dropdowns draw every choice in that texture / font (LibSharedMedia

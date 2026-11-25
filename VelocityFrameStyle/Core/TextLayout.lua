@@ -116,24 +116,23 @@ function TextLayout.ApplyTexts(host, elements, unit, stockNameFS, filter)
       else
       local text
       local directValue = false
-      if Format.IsBareName(e.format) then
+      local available = true
+      if e.id == "health" or e.id == "power" then
+        text, available = VFS.Client.FormatBarValue(unit, e.id, e.valueFormat or "current")
+        directValue = true
+      elseif Format.IsBareName(e.format) then
         text = VFS.Client.UnitDisplayName(unit)   -- may be a secret; SetText accepts it
-        directValue = true
-      elseif unit == "pettarget" and e.format == "[hp]" then
-        text = UnitHealth(unit)
-        directValue = true
-      elseif unit == "pettarget" and e.format == "[power]" then
-        text = UnitPower(unit)
         directValue = true
       else
         text = Format.ExpandOrEmpty(e.format, unit)
       end
       -- Direct widget values can be secret: never compare their content or measure
       -- their rendered width in Lua. Layout uses anchors instead.
-      local visible = e.anchor ~= "hidden" and (directValue or text ~= "")
+      local visible = e.anchor ~= "hidden" and available and (directValue or text ~= "")
       if fs.vfsVisible ~= visible then changed = true end
       fs.vfsVisible = visible
       fs:SetText(text)
+      fs:SetAlpha(1)
       fs:SetTextColor(TextLayout.ColorFor(e, unit, (e.id == "name" or e.id == "level") and stockNameFS or nil))
       fs:SetShown(visible)
       if visible and not directValue then
@@ -154,6 +153,9 @@ function TextLayout.ApplySample(host, elements, sample)
   for _, e in ipairs(elements) do
     local fs = TextLayout.AcquireText(host, e.id)
     local text = sample[e.id] or (e.format or ""):gsub("%[%w%%%+]+%]", "")
+    if e.id == "health" or e.id == "power" then
+      text = Format.SampleValue(e.id, e.valueFormat or "current")
+    end
     local visible = e.anchor ~= "hidden" and text ~= ""
     fs.vfsVisible = visible
     fs:SetText(text)

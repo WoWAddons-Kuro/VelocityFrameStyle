@@ -178,6 +178,33 @@ VFS.ClientFlavours.forever = {
     return UnitName(unit) or ""
   end,
   HealthValues = HealthValues,
+  -- Same API path as the installed Forever EasyFrames: secret numbers go only
+  -- through Blizzard formatters, then straight to SetText. Never inspect the result.
+  FormatBarValue = function(unit, kind, mode)
+    local isHealth = kind == "health"
+    local maximum
+    if isHealth then maximum = UnitHealthMax(unit) else maximum = UnitPowerMax(unit) end
+    local plainMax = Util.PlainNumber(maximum, nil)
+    if not isHealth and plainMax and plainMax <= 0 then return "", false end
+    if mode == "percent" then
+      if plainMax and plainMax <= 0 then return "0%", true end
+      if not (CurveConstants and CurveConstants.ScaleTo100 and C_StringUtil and C_StringUtil.RoundToNearestString) then return "", false end
+      local percent
+      if isHealth then
+        if not UnitHealthPercent then return "", false end
+        percent = UnitHealthPercent(unit, true, CurveConstants.ScaleTo100)
+      else
+        if not UnitPowerPercent then return "", false end
+        percent = UnitPowerPercent(unit, nil, false, CurveConstants.ScaleTo100)
+      end
+      return C_StringUtil.RoundToNearestString(percent) .. "%", true
+    end
+    local current
+    if isHealth then current = UnitHealth(unit) else current = UnitPower(unit) end
+    local numberText = AbbreviateNumbers or BreakUpLargeNumbers
+    if mode == "current_max" then return numberText(current) .. " / " .. numberText(maximum), true end
+    return numberText(current), true
+  end,
   PowerValues = Client.CommonPower,
   UnitIsSameUnit = function(a, b)
     local same = UnitIsUnit(a, b)

@@ -47,7 +47,6 @@ function Options.Create()
   theme:Add(Widgets.Radios(theme, "Font outline", { { "", "None" }, { "OUTLINE", "Outline" }, { "THICKOUTLINE", "Thick" } },
     function() return DB.Global().fontStyle end, function(v) DB.Global().fontStyle = v; RestyleAll() end), 20)
   theme:Add(Widgets.Slider(theme, "Bar background", 0, 1, 0.05, function() return DB.Global().backingAlpha end, function(v) DB.Global().backingAlpha = v; RestyleAll() end, Pct), 44, -10)
-  theme:Add(Widgets.Slider(theme, "Border brightness", 0, 1, 0.05, function() return DB.Global().borderDarken end, function(v) DB.Global().borderDarken = v; RestyleAll() end, Pct), 44, -10)
   theme:Add(Widgets.Check(theme, "Class-coloured health bars (players)", nil, function() return DB.Global().classColorHealth end, function(v) DB.Global().classColorHealth = v; RestyleAll() end), 26)
   theme:Add(Widgets.Radios(theme, "Portraits", { { "default", "Default" }, { "class_old", "Class (old)" }, { "class_new", "Class (new)" } },
     function() return DB.Global().portraitStyle end, function(v) DB.Global().portraitStyle = v; RestyleAll() end), 20)

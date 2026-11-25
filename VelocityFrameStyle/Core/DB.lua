@@ -8,25 +8,24 @@ local Util = VFS.Util
 local DB = {}
 VFS.DB = DB
 
-local DB_VERSION = 1
+local DB_VERSION = 2
 
 -- VFS_TextAnchor = "health" | "power" | "nameplate" | "above" | "below" | "hidden"
 -- VFS_TextAlign  = "left" | "center" | "right"
 -- VFS_ColorMode  = "stock" | "white" | "difficulty" | "class" | "reaction" | "custom"
 -- VFS_TextElement = { id, label, format, anchor, align, size, color, customColor = {r,g,b} }
 local function E(id, label, format, anchor, align, size, color)
-  return { id = id, label = label, format = format, anchor = anchor, align = align, size = size, color = color }
+  return { id = id, label = label, format = format, anchor = anchor, align = align, size = size, color = color,
+    valueFormat = (id == "health" or id == "power") and "current" or nil }
 end
 
 -- Default element rows, identical for every frame (order = flow order within a slot).
 local function DefaultElements()
   return {
-    E("name",      "Name",     "[name]",   "nameplate", "center", 10, "stock"),
+    E("name",      "Name",     "[name]",   "nameplate", "left",   10, "stock"),
     E("level",     "Level",    "[level]",  "nameplate", "right",  10, "difficulty"),
     E("health",    "Health",   "[hp]",     "health",    "center", 10, "white"),
-    E("healthpct", "Health %", "[hp%]",    "hidden",    "right",  10, "white"),
     E("power",     "Power",    "[power]",  "power",     "center", 10, "white"),
-    E("powerpct",  "Power %",  "[power%]", "hidden",    "right",  10, "white"),
   }
 end
 
@@ -67,14 +66,28 @@ DB.DEFAULT_PROFILE = { petTargetPlacement = DB.DEFAULT_PLACEMENT }   -- VFS_Prof
 function DB.Init()
   VelocityFrameStyleDB = type(VelocityFrameStyleDB) == "table" and VelocityFrameStyleDB or {}
   local db = VelocityFrameStyleDB
-  db.version = db.version or DB_VERSION
+  db.version = db.version or 1
   db.global = Util.ApplyDefaults(db.global or {}, DB.DEFAULT_GLOBAL)
   db.frames = type(db.frames) == "table" and db.frames or {}
   for _, id in ipairs(DB.FRAME_IDS) do
     db.frames[id] = db.frames[id] or DefaultFrame()
     db.frames[id].override = db.frames[id].override or {}
     if type(db.frames[id].elements) ~= "table" or #db.frames[id].elements == 0 then db.frames[id].elements = DefaultElements() end
+    if (db.version or 1) < 2 then
+      local old = {}
+      for _, e in ipairs(db.frames[id].elements) do old[e.id] = e end
+      local elements = DefaultElements()
+      for _, e in ipairs(elements) do
+        if (e.id == "name" or e.id == "level") and old[e.id] then
+          for _, key in ipairs({ "anchor", "align", "size", "color", "customColor" }) do
+            if old[e.id][key] ~= nil then e[key] = Util.DeepCopy(old[e.id][key]) end
+          end
+        end
+      end
+      db.frames[id].elements = elements
+    end
   end
+  db.version = math.max(db.version or 1, DB_VERSION)
   db.profiles = type(db.profiles) == "table" and db.profiles or {}
   -- Adopt the owner's 30% surface baseline once. Subsequent options edits persist.
   -- Only surface opacity changes; placements and text settings are untouched.
