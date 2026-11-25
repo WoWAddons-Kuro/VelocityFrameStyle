@@ -17,23 +17,46 @@ VFS.FrameBase = FrameBase
 VFS.Frames = {}     -- VFS_FrameID -> VFS_FrameState
 
 local WHITE8 = "Interface\\Buttons\\WHITE8x8"
-local ROUNDED_MASK = "Interface\\AddOns\\" .. ADDON_NAME .. "\\Assets\\rounded_mask.tga"
+local BAR_EDGE = "Interface\\AddOns\\" .. ADDON_NAME .. "\\Assets\\bar_edge.tga"   -- 24x24 radius-4 rounded square (edge-only 9-slice)
+local BAR_EDGE_SIZE, BAR_EDGE_INSET = 8, 4
 
--- Backdrop: black texture on a holder one level under the bar, inset 1 px (anti-aliased bar corners) --------
+-- Backdrop + rounded inset. The bar fill is a plain rectangle (StatusBars cannot be clipped to a shape without a
+-- stretched mask, which went elliptical). So the ROUNDING is drawn on top: a dark rounded-corner RING (edge-only
+-- 9-slice of bar_edge.tga, no bgFile) in the plate colour sits one frame level ABOVE the bar and covers its corners,
+-- making the fill read as a rounded bar inside a dark rounded cut-out (owner 2026-11-25: "clipped behind a dark
+-- rounded rect"). The dark backdrop behind the fill is a separate holder one level BELOW the bar as before.
 function FrameBase.AcquireBackdrop(bar)
   if bar.vfsBackdrop then return bar.vfsBackdrop end
   local h = CreateFrame("Frame", nil, bar:GetParent())
-  h:SetPoint("TOPLEFT", bar, "TOPLEFT", 1, -1)
-  h:SetPoint("BOTTOMRIGHT", bar, "BOTTOMRIGHT", -1, 1)
+  h:SetAllPoints(bar)
   h.tex = h:CreateTexture(nil, "BACKGROUND", nil, -8)
   h.tex:SetAllPoints()
   h.tex:SetTexture(WHITE8)
-  local function Sync() h:SetFrameStrata(bar:GetFrameStrata()); h:SetFrameLevel(math.max(0, bar:GetFrameLevel() - 1)) end
+  -- the rounded inset ring, above the bar so it covers the fill's square corners
+  local ring = CreateFrame("Frame", nil, bar:GetParent(), BackdropTemplateMixin and "BackdropTemplate" or nil)
+  ring:SetPoint("TOPLEFT", bar, "TOPLEFT", -1, 1)
+  ring:SetPoint("BOTTOMRIGHT", bar, "BOTTOMRIGHT", 1, -1)
+  if ring.SetBackdrop then
+    ring:SetBackdrop({ edgeFile = BAR_EDGE, edgeSize = BAR_EDGE_SIZE, insets = { left = BAR_EDGE_INSET, right = BAR_EDGE_INSET, top = BAR_EDGE_INSET, bottom = BAR_EDGE_INSET } })
+  end
+  ring:EnableMouse(false)
+  h.ring = ring
+  local function Sync()
+    h:SetFrameStrata(bar:GetFrameStrata()); h:SetFrameLevel(math.max(0, bar:GetFrameLevel() - 1))
+    ring:SetFrameStrata(bar:GetFrameStrata()); ring:SetFrameLevel(bar:GetFrameLevel() + 1)
+  end
   Sync()
   hooksecurefunc(bar, "SetFrameLevel", Sync)
   hooksecurefunc(bar, "SetFrameStrata", Sync)
   bar.vfsBackdrop = h
   return h
+end
+
+-- Colour the inset ring to match the plate (so the bar's corners look cut out of the plate)
+function FrameBase.ColorBackdrop(bar, backingAlpha, pr, pg, pb, pa)
+  local h = bar.vfsBackdrop; if not h then return end
+  h.tex:SetColorTexture(0, 0, 0, backingAlpha)
+  if h.ring.SetBackdropBorderColor then h.ring:SetBackdropBorderColor(pr, pg, pb, pa) end
 end
 
 -- Colour policy (owner): health GREEN or class colour (players, when classColorHealth); power = PowerBarColor[token].
@@ -149,16 +172,20 @@ function FrameBase.ApplyAppearance(st)
   local enabled = DB.Frame(id).enabled
   local texPath = Util.StatusBarPath(DB.Effective(id, "barTexture"))
   local backing = DB.Effective(id, "backingAlpha")
+  local pc = DB.Global().plateColor or { 0.02, 0.02, 0.02 }
+  local pa = DB.Global().plateAlpha or 0.9
   for kind, bar in pairs(st.bars) do
     if enabled then
       bar.stock:SetStatusBarTexture(texPath)
       local t = bar.stock:GetStatusBarTexture(); if t then t:SetAlpha(1); t:SetHorizTile(false); t:SetVertTile(false) end
       ApplyFillMask(bar.stock)
       if kind == "health" then ApplyHealthColor(bar.stock, st.unit) else ApplyPowerColor(bar.stock, st.unit) end
-      bar.backdrop.tex:SetColorTexture(0, 0, 0, backing)
+      FrameBase.ColorBackdrop(bar.stock, backing, pc[1], pc[2], pc[3], pa)
       bar.backdrop:Show()
+      bar.backdrop.ring:Show()
     else
       bar.backdrop:Hide()
+      bar.backdrop.ring:Hide()
     end
   end
   -- Blizzard chrome: alpha 0 while enabled; keep-list never touched

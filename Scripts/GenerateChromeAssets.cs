@@ -8,6 +8,7 @@
 // Outputs (uncompressed 32-bit TGA, top-left origin):
 //   rounded_mask.tga   32x32  rounded rect r=6   -> MaskTexture on each stock bar fill (rounded bar corners)
 //   rounded_edge.tga   64x64  rounded rect r=12  -> BackdropTemplate edgeFile+bgFile 9-slice for the VFS_BarPlate
+//   bar_edge.tga       24x24  rounded rect r=4   -> edge-only 9-slice ring drawn OVER each bar fill: rounds the fill's corners
 //   soft_disc.tga      64x64  feathered disc     -> VFS_PortraitDisc soft rim and the ADD-blend combat glow
 //   soft_plate.tga    128x64  feathered rounded rect r=16 -> soft outer edge behind the plate (long tail)
 
@@ -19,6 +20,7 @@ Console.WriteLine($"Writing chrome assets to {Path.GetFullPath(outDir)}");
 
 WriteTga(Path.Combine(outDir, "rounded_mask.tga"), 32, 32, (x, y) => RoundedRectCoverage(x, y, 32, 32, 6, 0.5));
 WriteTga(Path.Combine(outDir, "rounded_edge.tga"), 64, 64, (x, y) => RoundedRectCoverage(x, y, 64, 64, 12, 0.5));
+WriteTga(Path.Combine(outDir, "bar_edge.tga"), 24, 24, (x, y) => RoundedRectCoverage(x, y, 24, 24, 4, 0.5));
 WriteTga(Path.Combine(outDir, "soft_disc.tga"), 64, 64, (x, y) => FeatheredDisc(x, y, 64, 0.78));
 WriteTga(Path.Combine(outDir, "soft_plate.tga"), 128, 64, (x, y) => RoundedRectCoverage(x, y, 128, 64, 16, 6.0));
 Console.WriteLine("SUCCESS");
