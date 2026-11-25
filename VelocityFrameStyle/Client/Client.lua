@@ -47,7 +47,6 @@ Client.INTERFACE = {
   "FormatBarValue",       -- (unit, health|power, current|current_max|percent) -> text (possibly secret), available boolean
   "HealthValues",         -- (unit) -> cur|nil, max|nil, pct|nil
   "PowerValues",          -- (unit) -> cur|nil, max|nil, pct|nil, token|nil
-  "UnitIsSameUnit",       -- (a, b) -> true|false|nil (nil = secret)
   "DifficultyColor",      -- (level) -> r, g, b
 }
 

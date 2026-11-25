@@ -43,7 +43,7 @@ DB.DEFAULT_GLOBAL = {
   classColorHealth = false,       -- players only
   portraitStyle = "default",      -- default | class_old | class_new
   -- pet-target extras
-  petTargetHideWhenSame = false,
+  petTargetHealthOnly = true,
   petTargetFlashOnNew = true,
 }
 
@@ -68,6 +68,7 @@ function DB.Init()
   local db = VelocityFrameStyleDB
   db.version = db.version or 1
   db.global = Util.ApplyDefaults(db.global or {}, DB.DEFAULT_GLOBAL)
+  db.global.petTargetHideWhenSame = nil -- retired: target equality may be secret
   db.frames = type(db.frames) == "table" and db.frames or {}
   for _, id in ipairs(DB.FRAME_IDS) do
     db.frames[id] = db.frames[id] or DefaultFrame()

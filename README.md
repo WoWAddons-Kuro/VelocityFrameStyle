@@ -11,8 +11,9 @@ Works on Classic Era and WoW Forever from a single addon.
   inherited by every frame; any frame can override any of them.
 - **Visual pickers.** The bar-texture and font dropdowns draw every choice in that texture / font (LibSharedMedia
   textures from other addons are listed when present).
-- **Pet target frame.** Clickable (left-click targets, right-click menu, key binding), placed and scaled in Edit Mode
-  (saved per layout, always shown while Edit Mode is open), optional hide while your pet attacks your own target.
+- **Pet target frame.** Clickable (left-click targets, right-click menu, key binding), positioned per Edit Mode layout.
+  Bar width/heights are adjustable without zoom. **Only show health bar** defaults on and also applies to Edit Mode previews.
+  The frame no longer hides based on matching your target; that comparison is unreliable with secret values.
 
 `/vfs` opens the options, `/vfs status` prints diagnostics. Stands down automatically if EasyFrames or another unit-frame
 addon is loaded.

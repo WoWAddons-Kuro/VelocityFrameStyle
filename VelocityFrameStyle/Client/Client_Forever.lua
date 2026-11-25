@@ -229,10 +229,5 @@ VFS.ClientFlavours.forever = {
     return numberText(current), true
   end,
   PowerValues = Client.CommonPower,
-  UnitIsSameUnit = function(a, b)
-    local same = UnitIsUnit(a, b)
-    if Util.IsSecret(same) then return nil end
-    return same == true
-  end,
   DifficultyColor = Client.CommonDifficultyColor,
 }

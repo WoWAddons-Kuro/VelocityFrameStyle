@@ -355,7 +355,6 @@ local function OnEvent(_, event, arg1, arg2)
     Util.Print("loaded (%s). /vfs for options, /vfs status for details", Client.flavour)
   elseif event == "ADDON_ACTION_BLOCKED" or event == "ADDON_ACTION_FORBIDDEN" then
     if arg1 == ADDON_NAME then
-      if tostring(arg2):find("EnableMouse") then VFS.PetTargetVisibility.mouseBlocked = true end
       Util.WarnOnce("blocked:" .. tostring(arg2), "the game blocked " .. tostring(arg2) .. " (in combat)")
     end
   elseif event == "PLAYER_REGEN_ENABLED" then
@@ -368,12 +367,11 @@ local function OnEvent(_, event, arg1, arg2)
   elseif event == "PLAYER_REGEN_DISABLED" then
     for _, st in pairs(VFS.Frames) do VFS.FrameBase.OnCombatChanged(st) end
   elseif event == "UNIT_TARGET" then
-    if VFS.PetTarget.frame then VFS.PetTarget.OnPetTargetChanged(); VFS.PetTargetVisibility.ApplySoftHide() end
+    if VFS.PetTarget.frame then VFS.PetTarget.OnPetTargetChanged() end
   elseif event == "UNIT_PET" then
-    if VFS.PetTarget.frame then VFS.PetTarget.OnPetTargetChanged(); VFS.PetTargetVisibility.ApplySoftHide() end
+    if VFS.PetTarget.frame then VFS.PetTarget.OnPetTargetChanged() end
     if VFS.Frames.pet then VFS.Pet.OnEvent(event, arg1) end
   elseif event == "PLAYER_TARGET_CHANGED" then
-    if VFS.PetTarget.frame then VFS.PetTargetVisibility.ApplySoftHide() end
     if VFS.Frames.target then VFS.Target.OnEvent(event) end
   else
     if VFS.Frames.player then VFS.Player.OnEvent(event, arg1) end

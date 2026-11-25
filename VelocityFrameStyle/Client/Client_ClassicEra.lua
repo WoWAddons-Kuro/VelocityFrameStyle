@@ -127,6 +127,5 @@ VFS.ClientFlavours.classic_era = {
     return text, text ~= ""
   end,
   PowerValues = Client.CommonPower,
-  UnitIsSameUnit = function(a, b) return UnitIsUnit(a, b) == true end,
   DifficultyColor = Client.CommonDifficultyColor,
 }

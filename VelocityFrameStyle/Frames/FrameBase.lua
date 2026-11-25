@@ -193,7 +193,8 @@ function FrameBase.RefreshPowerVisibility(st)
   local absent = false
   if DB.Frame(st.id).enabled then
     if st.id == "pettarget" then
-      absent = not VFS.PetTarget.IsSample() and Client.HasPowerResource(st.unit) == false
+      absent = DB.Global().petTargetHealthOnly
+        or (not VFS.PetTarget.IsSample() and Client.HasPowerResource(st.unit) == false)
     else
       -- IsShown is local to the bar: hiding the whole target frame is not
       -- evidence of no resource. Do not use IsVisible here.

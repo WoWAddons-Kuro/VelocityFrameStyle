@@ -72,9 +72,12 @@ assert(backdrop:GetFrameStrata() == 'MEDIUM' and backdrop.ring:GetFrameStrata() 
 -- DB baseline migration is one-shot and must not reattach a dragged frame.
 assert(loadfile('VelocityFrameStyle/Core/Util.lua'))('VelocityFrameStyle', ns)
 assert(loadfile('VelocityFrameStyle/Core/DB.lua'))('VelocityFrameStyle', ns)
-VelocityFrameStyleDB = { global = { backingAlpha = 0.6 } }
+VelocityFrameStyleDB = { global = { backingAlpha = 0.6, petTargetHideWhenSame = true } }
 ns.DB.Init()
 assert(ns.DB.Global().backingAlpha == 0.3)
+assert(ns.DB.Global().petTargetHealthOnly == true)
+assert(ns.DB.Global().petTargetHideWhenSame == nil, 'retired setting must be removed')
+ns.DB.Global().petTargetHealthOnly = false -- test automatic policy separately below
 ns.DB.Global().backingAlpha = 0.45
 ns.DB.Init()
 assert(ns.DB.Global().backingAlpha == 0.45)
@@ -121,6 +124,17 @@ for _, id in ipairs({'target', 'pettarget'}) do
   if id == 'pettarget' then
     power.stock.shown = false; preview = true; ns.FrameBase.RefreshPowerVisibility(st)
     assert(not st.powerAbsent, 'Edit Mode retains sample power')
+    ns.DB.Global().petTargetHealthOnly = true
+    ns.Client.HasPowerResource = function() error('health-only must not query secret resource data') end
+    ns.FrameBase.RefreshPowerVisibility(st)
+    assert(st.powerAbsent and st.slots.power == nil and st.slots.below == health)
+    assert(power.stock.alpha == 0 and power.backdrop.alpha == 0 and power.backdrop.ring.alpha == 0)
+    preview = false; ns.FrameBase.RefreshPowerVisibility(st); assert(st.powerAbsent)
+    ns.DB.Global().petTargetHealthOnly = false
+    ns.Client.HasPowerResource = function() return true end
+    ns.FrameBase.RefreshPowerVisibility(st)
+    assert(not st.powerAbsent and st.slots.power == power.stock and power.stock.alpha == 1)
+    ns.DB.Init(); assert(ns.DB.Global().petTargetHealthOnly == false, 'explicit opt-out must persist')
   end
 end
 print('PASS: flat borders, five sizes, layer sync, opacity, placement and power visibility')

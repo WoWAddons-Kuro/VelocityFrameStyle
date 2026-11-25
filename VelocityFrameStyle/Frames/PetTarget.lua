@@ -125,7 +125,6 @@ function PetTarget.Create()
     if acc < 0.2 then return end
     acc = 0
     PetTarget.Update()
-    VFS.PetTargetVisibility.ApplySoftHide()
   end)
 
   -- Register with FrameBase so appearance/text come from the shared machinery (bars are ours). Geometric chrome:
@@ -254,6 +253,10 @@ function PetTarget.SetSample(on)
   f.power:SetMinMaxValues(0, 1); f.power:SetValue(0.4); f.power:SetStatusBarColor(0, 0, 1)
   FrameBase.ApplyAppearance(PetTarget.state)
   TextLayout.ApplySample(PetTarget.state.host, DB.Elements("pettarget"), SAMPLE)
+  if PetTarget.state.powerAbsent then
+    local powerText = PetTarget.state.host.text.power
+    if powerText then powerText.vfsVisible = false; powerText:Hide() end
+  end
   TextLayout.Layout(PetTarget.state.host, DB.Elements("pettarget"), PetTarget.state.slots)
 end
 

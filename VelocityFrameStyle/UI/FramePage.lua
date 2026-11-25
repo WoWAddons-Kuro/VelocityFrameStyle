@@ -117,9 +117,9 @@ function FramePage.BuildFrameSection(content, id)
 
   -- Frame extras
   if id == "pettarget" then
-    box:Add(Widgets.Check(box, "Hide when the pet's target is also your target",
-      "Fades the frame out (and lets clicks through) while your pet attacks the unit you have targeted. No target of your own counts as different.",
-      function() return DB.Global().petTargetHideWhenSame end, function(v) DB.Global().petTargetHideWhenSame = v; VFS.PetTargetVisibility.ApplySoftHide() end), 26, -8)
+    box:Add(Widgets.Check(box, "Only show health bar",
+      "Hide the pet-target power bar and its text, background and border, including in Edit Mode.",
+      function() return DB.Global().petTargetHealthOnly end, function(v) DB.Global().petTargetHealthOnly = v; Restyle(id) end), 26, -8)
     box:Add(Widgets.Check(box, "Flash when the pet picks a new target", nil,
       function() return DB.Global().petTargetFlashOnNew end, function(v) DB.Global().petTargetFlashOnNew = v end), 26)
     box:Add(Widgets.Button(box, "Copy text layout from Target", function()
