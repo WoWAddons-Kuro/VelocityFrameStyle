@@ -81,10 +81,19 @@ Three criteria, inherited from PlateStyle:
 
 ## Files
 
+**Packager-style repo [D 2026-11-25]:** the addon lives one level down (`VelocityFrameStyle\VelocityFrameStyle\`) so the
+repo root holds `Scripts\` (C# asset generators), `SPECS\`, docs and icon sources without shipping them. `.pkgmeta`
+`move-folders` lifts the inner folder; `publish.cmd` / `release.cmd` already understand `D\D\D.toc` (KondoBags pattern).
+
 ```
-VelocityFrameStyle/
+VelocityFrameStyle/                                 repo root (git)
+  .pkgmeta (package-as + move-folders; ignore *.md, SPECS, Scripts, Assets, *.png/*.jpg)  .gitignore  LICENSE  README.md
+  SPECS/00_VelocityFrameStyle.md                    this file
+  Scripts/GenerateChromeAssets.cs                   dotnet-run script: writes the geometric chrome .tga set into the addon's Assets/
+  Scripts/_README-howto-write-scripts.md            copy of the workspace C# script convention
+  Assets/                                           icon sources / screenshots (NOT shipped)
+  VelocityFrameStyle/                               the addon (shipped)
   VelocityFrameStyle.toc / _Vanilla.toc / _Camelot.toc
-  .pkgmeta (package-as: VelocityFrameStyle; ignore: *.md, SPECS, Assets/Screenshots)  .gitignore  LICENSE  README.md
   Bindings.xml                      CLICK VelocityFrameStylePetTarget:LeftButton
   Libs/LibStub, Libs/LibEditMode    (vendored, unmodified; only for PetTarget placement)
   Client/Client.lua                 Client.INTERFACE (region resolvers + capability flags + value shims), VFS.ClientFlavours = {}
@@ -177,7 +186,152 @@ Client.INTERFACE = {
 
 ### Frame strategies — Era restyles in place, Forever overlays
 
-This is the one place the two clients differ in *approach*, and it is the lesson from EasyFrames' two trees:
+### Chrome: GEOMETRIC, no art [D 2026-11-25, FINAL]
+
+Owner: *"I already set EasyFrames' chrome intensity to 2.2 % — effectively black. If you can draw a black (softened)
+circle and a black (softened) round rect, build the whole thing geometrically from the start and never use any chrome.
+No visible border line, just near black. The only thing other than black: ideally the OUTSIDE edges have some softness
+— long tail."*
+
+What is on screen is three shapes. All are drawable from primitives the client ships; no `.blp`, no cut-out window,
+no mask-matching, no frame-level fight with Blizzard's art. **Bar height is then a plain number.**
+
+| VFS element | Primitive | Notes |
+|---|---|---|
+| `VFS_PortraitDisc` — near-black disc behind the portrait | `WHITE8x8` + `MaskTexture` `CircleMask` (Blizzard's own portraits use it) | radius = portrait radius + `discPad` (default 4 px) |
+| `VFS_BarPlate` — near-black rounded rect behind name row + bars | `BackdropTemplate`, `bgFile = WHITE8x8`, `edgeFile` = **our** `Assets\rounded_edge.tga` (9-slice corner radius 6) tinted to the plate colour so no line shows | spans from the disc's centre-line to the right edge of the bars; height follows name row + health + power + padding |
+| bar corners | `MaskTexture` = **our** `Assets\rounded_mask.tga` on each stock fill | 32×32, same radius as the plate |
+| glows (combat, target, new pet-target) | `SetBlendMode("ADD")` on `TempPortraitAlphaMask` (disc) / `UI-TargetingFrame-Flash` (plate) + `AnimationGroup` alpha | existing VPTF pulse pattern |
+| level badge | disc + ring (VPTF code) | |
+| **soft outer edge (long tail)** | second disc / plate 2–3 px larger at 25–35 % alpha behind the main one; later a proper feathered `.tga` if the two-layer trick isn't soft enough | NOT in M0; tracked below |
+
+- **Blizzard chrome — KEEP list [D 2026-11-25].** Everything Blizzard draws on the frame is alpha-zeroed (R2) EXCEPT
+  these three, which stay stock and visible (`Client.KeepRegions(id)`):
+  1. the **"zzz" rest animation** — Player `PlayerFrameContentContextual.PlayerRestLoop` (flipbook; Era `PlayerRestIcon`);
+  2. the **in-combat swords** — Player `PlayerFrameContentContextual.AttackIcon` (Era `PlayerAttackIcon`);
+  3. the **red in-combat glow** — *replaced by our own* `VFS_CombatGlow`: ADD-blend soft glow following the plate/disc
+     shape, shown while `UnitAffectingCombat(unit)`, colour/alpha from Theme (`combatGlowColor` default red 0.7 α).
+     Blizzard's `Flash` / `FrameFlash` / `PetFrameFlash` are alpha-zeroed; our glow hooks the same visibility events
+     (`PLAYER_REGEN_*`, `UNIT_FLAGS`, `UNIT_COMBAT`) so it appears exactly when Blizzard's would.
+  Alpha-zeroed (not kept): `FrameTexture`, `Flash`, `StatusTexture` (Forever's rest/combat art — superseded by 1 and 3),
+  `LevelBackgroundCircle`, `ReputationColor`, container `Background`, loss bars, `PlayerPortraitCornerIcon` /
+  `PrestigePortrait` embellishments, Pet `PetAttackModeTexture`. Group/leader/role/PvP/raid-target icons are **not** chrome:
+  they stay stock and are repositioned onto the plate only if they collide with our text (M3).
+  ```lua
+  Client.KeepRegions(frameID) -> { Region, ... }   -- never alpha-zeroed by FrameBase; today: RestLoop, AttackIcon
+  Client.ChromeRegions(frameID) -> { Region, ... } -- everything we alpha-zero (art, flash, status, strips, backgrounds)
+  ```
+  `FrameBase.ApplyAppearance` iterates `ChromeRegions` → alpha 0 (enabled) / 1 (disabled); never touches `KeepRegions`.
+- **Stock bars stay and are styled in place** — texture, colour, **height, width, anchor** via `Geometry.PlaceBar` on
+  both clients (`SetHeight/SetPoint` on the bar frames is unprotected; only measurement of some regions is restricted).
+  Blizzard's `HealthBarMask`/`ManaBarMask` → `RemoveMaskTexture` from the fill (they are shaped for Blizzard's window),
+  our rounded mask added instead. The old overlay path is **deleted**, not kept as fallback.
+- **Portrait** stays Blizzard's (`CircleMask`-clipped already); class-portrait styles as now.
+  **Portrait style selection stays** [D]: default / class (old) / class (new) exactly as built (`FrameBase.ApplyPortrait`).
+- **Colours:** `plateColor` default `{0.02, 0.02, 0.02, 0.9}` (near black, slightly translucent); `plateAlpha` slider.
+  No border colour setting exists (no border).
+- **Layout = EasyFrames' geometry [D, corrected 2026-11-25 from EF screenshot]:** the **disc tucks UNDER the plate** —
+  the rounded plate is drawn *on top* and its left end overlaps the portrait disc's right side; the portrait itself
+  (Blizzard's masked texture) is above both. Draw order: disc < plate < portrait < bars/text. Plate's left edge sits at
+  roughly the disc's centre. **M0 uses FIXED bar sizes taken from EF-Forever's constants** (table below):
+  Player/Target health **113×24**, power 113(+2+2 edge)×**12**; Pet health **70×10**, power **76×7** (EF values; pet
+  gets a taller preset once the text grid is in). Adjustable `barHeight`/`powerHeight` sliders are **deferred** [D]
+  (*"start with a fixed tall healthbar and worry about adjustable heights later"*) — the constants live in one table
+  (`Chrome.LAYOUT[frameID]`) so the sliders are a one-step change. `barGap` 1, `platePad` 4, `nameRowHeight` 12.
+- **Classification art = Blizzard's [D]:** skull (`UI-TargetingFrame-Skull` / Forever `HighLevelTexture`), elite / rare /
+  rare-elite dragons and boss markers stay **Blizzard's own textures/atlases**, kept visible (added to `KeepRegions`) and
+  re-anchored onto our plate/disc where Blizzard's anchor assumed its chrome (M0: skull on the level badge; dragons M3).
+- `VFS_ChromeStyle` enum is dropped: there is one style. EasyFrames' textures are **not** shipped (the previous section
+  is kept below only as the record of the measured EF geometry, useful for default bar sizes).
+
+```lua
+-- Frames/Chrome.lua  (new)                     one per VFS_FrameState, created in FrameBase.Acquire
+VFS_Chrome = { disc = Frame, discSoft = Frame|nil, plate = Frame(BackdropTemplate), plateSoft = Frame|nil }
+Chrome.Create(st)          -- builds the shapes under the stock bars (frame level = stock bar - 1) and alpha-zeros Blizzard art
+Chrome.Layout(st)          -- sizes disc to portrait, plate to name row + bars + pads; called after Geometry.PlaceBar
+Chrome.ApplyColors(st)     -- plateColor / plateAlpha; glows
+```
+
+Open (long tail): soft outer edge quality; whether the plate's left end should tuck under the disc (EF look) or butt
+against it; a "square" preset (radius 0) for a flatter modern look.
+
+---
+
+#### Previous decision (superseded same day, kept for the measured EF geometry): VFS supplies the frame art — the EasyFrames model
+
+**The point of the addon is controlling bar HEIGHT (owner).** Blizzard's chrome is one atlas with the bar window cut
+out at a fixed size (Forever: Player health 124×15, mana 124×10; Target 126×15; Pet 70×11). A taller bar is impossible
+inside Blizzard's art. EasyFrames gets its tall bars by **swapping the frame texture for its own** with a taller cut-out
+(`FrameTexture:SetTexture(EF art)`) and sizing the *stock* bar into it. That is our model too:
+
+- **Bars = Blizzard's stock StatusBars, styled and resized in place** (texture, colour, height, anchor). Never our own
+  bar objects. `Geometry.PlaceBar` does the sizing on **both** clients — `SetHeight/SetPoint` on `HealthBarsContainer`
+  and the bars is unprotected on Forever too (EF-Forever does it); only *measurement* of a few restricted regions is not.
+  The old Era-vs-Forever "overlay" split is dead; `Client.MovableBars` returns the bars on every client.
+- **Chrome = ours.** `Client.ChromeArt(frameID)` → `{ texture, texCoords, barWindow = { health = {x,y,w,h}, power = … } }`
+  written onto Blizzard's `FrameTexture` region (`SetTexture` + `SetTexCoord`), same technique EF uses.
+- **Masks:** Blizzard's `HealthBarMask`/`ManaBarMask` are sized to Blizzard's window → removed from the stock fill
+  (`RemoveMaskTexture`); our chrome's cut-out clips instead. Blizzard's black container `Background` alpha-zeroed; our
+  backdrop (one level under the bar) is the dark backing.
+- **Re-assert** after Camelot/Blizzard art functions (`PlayerFrame_UpdateHealthBarVisuals`, `TargetFrame CheckClassification`,
+  `PetFrame Update`): post-hooks call `Geometry.PlaceBar` + chrome re-apply.
+- **Assets, M0 [D]:** *use EasyFrames' textures as-is* — `Textures\TargetingFrame\*.blp` from EasyFrames-Forever (BSD; header
+  credit + README). Copied into `Assets\Chrome\EasyFrames\`. Their window geometry is measured from EF-Forever's
+  `Modules\*.lua` constants. A VFS-drawn set is a later milestone ("modern look", M4) — *"then we can address this later
+  in a better way"*.
+- `barHeight` becomes a real Theme setting (slider), applied by `Geometry` within the chrome window's max height.
+
+**EasyFrames-Forever art + geometry (measured from EF `EasyFrames.lua` `Const`, `Modules\*.lua`, 2026-11-25):**
+
+| Asset (EF `Textures\TargetingFrame\`) | Used for | TexCoords EF applies | Window geometry EF sizes the stock bar to |
+|---|---|---|---|
+| `UI-TargetingFrame-V3.blp` | Player chrome | `0.024, 0.99, 0.25, 1` | health **113×24** at CENTER of frame (−30, 8 mirrored: Player uses TOPLEFT 85,−30); mana **113×12** (+2 px `MANABAR_ART_EDGE` each side → 117 wide) |
+| `UI-TargetingFrame-Target-V3.blp` | Target chrome ("2 px larger") | `0.024, 0.99, 0.25, 1` | health 113×24 at CENTER (−30, 8); mana `TARGET_MANABAR_WIDTH` **125** (+2 edge), TOPRIGHT from container LEFT (157, −5) |
+| `UI-TargetingFrame-TargetofTarget-V3.blp` | Pet (and ToT/Party) chrome | `0.01, 0.97, 0, 0.8` | health **70×10** BOTTOMLEFT→PetPortrait RIGHT (2, −3.5); mana **76×7** TOPLEFT→health BOTTOMLEFT (−4, −1) |
+| `UI-TargetingFrame-Flash-V3.blp`, `UI-Player-Status-V3.blp` | combat / status glows | `0.01, 0.985, 0.24, 1` | — |
+| `UI-TargetingFrame-{Elite,Rare,Rare-Elite,Minus}-Light.blp`, `UI-UnitFrame-Boss.blp` | classification variants / boss | — | M3 |
+| `UI-LevelCircle.tga` | level ring | — | EF `TARGET_LEVEL_RING_X/Y` |
+
+EF constants: `HEALTHBAR_WIDTH 113`, `HEALTHBAR_WIDTH_BLIZZARD 124`, `HEALTHBAR_HEIGHT 24`, `MANABAR_HEIGHT 12`,
+`TARGET_MANABAR_WIDTH 125`, `MANABAR_ART_EDGE 2`, `TARGET_MANABAR_RIGHT 157`, `TARGET_MANABAR_TOP −5`.
+EF hides native fills (`ForceHiddenFill`), removes the native mana mask (`UnmaskManaFill`), and sets the
+`HealthBarsContainer`/bars' frame level to the container's. We do the same but on the **stock** bars (no parallel bars).
+
+`Client.ChromeArt(frameID)` → `{ file, texCoords = {l,r,t,b}, health = VFS_BarWindow, power = VFS_BarWindow }` where
+`VFS_BarWindow = { point, relTo = "button"|"portrait"|"healthbar", relPoint, x, y, width, height }` (per-flavour; Era
+values come from EF-Era `Core.lua` MovePlayerFrameBars etc. in M1). `barHeight` scales `health.height` ≤ window max.
+
+**Chrome styles — `VFS_ChromeStyle = "easyframes" | "geometric"` (owner question 2026-11-25: "can we do rounded
+borders, circles, glow? then we can do it all geometrically" — yes):**
+
+| Shape | Mechanism | Already proven in |
+|---|---|---|
+| rounded-rect border | `NineSliceUtil.ApplyLayout` with corner/edge pieces, or `BackdropTemplate` + rounded `edgeFile`; thickness/colour via `SetVertexColor` | PlateStyle `AcquireEdges` (square), Blizzard tooltips |
+| disc / ring (portrait, level badge) | `MaskTexture` `CircleMask` / `TempPortraitAlphaMask` on `WHITE8x8`; ring = outer disc + smaller inner disc | VPTF / VFS level badge |
+| rounded bar corners | `MaskTexture` on the fill: one small VFS rounded-rect mask `.tga`, or Blizzard's `UI-HUD-UnitFrame-*-Bar-*-Mask` atlases | Blizzard's own bars |
+| soft glow (combat, target, new pet target) | `SetBlendMode("ADD")` on a radial-alpha texture + `AnimationGroup` alpha | VPTF pulse, Blizzard `UI-TargetingFrame-Flash` |
+
+Runtime cannot draw arbitrary curves, but one 64×64 rounded-corner mask asset + 9-slice covers every rounded rect at
+every size, and `CircleMask` ships in the client. **Geometric chrome frees bar height completely** (no cut-out to fit).
+
+- M0: `"easyframes"` only (EF's `.blp` set, as decided).
+- M4 "Modern look": `"geometric"` — Blizzard `FrameTexture` alpha-zeroed; our 9-slice border per bar (radius preset,
+  thickness, colour), `CircleMask` portrait + coloured ring, disc level badge, ADD glow. Both styles behind one
+  `Client.ChromeArt(frameID)` contract so M0's geometry code is reused unchanged.
+
+History of how we got here (two dead ends, kept so they are not retried):
+**SUPERSEDED 2026-11-25: both clients style the STOCK bars in place. No overlay bars.** Bring-up built Forever
+overlays and spent a day fighting Blizzard's frame levels (bars under/over the chrome, container `Background` dimming
+the fill, sinking the stock bar) — exactly the parallel-frame approach EasyFrames-Forever uses and this addon exists to
+avoid. Owner: *"we're trying NOT to make our own frames, we're trying to STYLE the existing ones."* The stock bar already
+sits in the mask-clipped art window; `SetStatusBarTexture`, `SetStatusBarColor`, font and alpha writes are all
+unprotected on it. Only its **value** is Blizzard's (R5 holds). So: `Client.StyleInPlace(id, kind) == true` for every
+Blizzard frame on every client → `draw = stock`; our backdrop sits one level under it; Blizzard's own black `Background`
+and loss bars are alpha-zeroed (`Client.StockBarExtras`); our colour is re-asserted via a `SetStatusBarColor` post-hook.
+Era additionally may *resize/re-anchor* (`MovableBars` + `Geometry`). The overlay code remains only as a fallback for a
+frame a Client explicitly declines (none today). The table below is kept for history; "Overlay" column no longer applies.
+
+Original reasoning (historical):
 
 | | Era (11509) | Forever (16001) |
 |---|---|---|

@@ -1,12 +1,16 @@
 package-as: VelocityFrameStyle
 
+# Packager-style repo: the addon lives one level down so the repo root can hold Scripts/ (C# asset generators),
+# SPECS/, docs and icon sources without shipping them. publish.cmd discovers D\D\D.toc; release.cmd zips the same.
+move-folders:
+  VelocityFrameStyle/VelocityFrameStyle: VelocityFrameStyle
+
 ignore:
-  - README.md
+  - ".git*"
+  - "*.md"
   - SPECS
-  - .github
-  - .gitignore
+  - Scripts
+  - Assets
   - .pkgmeta
-  - Assets/Screenshots
-  - Assets/VelocityFrameStyle_AppIcon.png
-  - Assets/VelocityFrameStyle_AppIcon.jpg
-  - Assets/VelocityFrameStyle_Icon_256.png
+  - "*.png"
+  - "*.jpg"

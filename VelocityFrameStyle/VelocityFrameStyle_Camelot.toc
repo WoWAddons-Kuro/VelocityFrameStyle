@@ -27,9 +27,11 @@ Core\TextLayout.lua
 Core\Geometry.lua
 
 Frames\FrameBase.lua
+Frames\Chrome.lua
 Frames\Player.lua
 Frames\Target.lua
 Frames\Pet.lua
+Frames\ToT.lua
 Frames\PetTarget.lua
 Frames\PetTargetVisibility.lua
 

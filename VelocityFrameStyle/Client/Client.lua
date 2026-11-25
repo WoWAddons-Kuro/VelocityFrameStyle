@@ -23,19 +23,19 @@ Client.INTERFACE = {
   -- Regions (nil = this client has no such region; the feature degrades to stock) -------------
   "HealthBar",            -- (frameID) -> StatusBar|nil
   "PowerBar",             -- (frameID) -> StatusBar|nil
-  "FrameArt",             -- (frameID) -> Texture|nil     the frame border art (SetVertexColor for border darkness)
-  "ChromeFrame",          -- (frameID) -> Frame|nil       the frame that OWNS the border art; our bars are painted one
-                          --                                level BELOW it so the art's transparent window clips them
+  "ChromeRegions",        -- (frameID) -> { Region, ... } every Blizzard art region we alpha-zero: frame texture, flash,
+                          --                                status glow, level circle, reaction strip, container background, loss bars
+  "KeepRegions",          -- (frameID) -> { Region, ... } Blizzard art that STAYS visible (spec keep-list): rest zzz,
+                          --                                combat swords, skull / classification dragons
+  "ClassificationIcon",   -- (frameID) -> Texture|nil     skull (HighLevelTexture) - re-anchored onto our level badge
   "Portrait",             -- (frameID) -> Texture|nil
   "NameText",             -- (frameID) -> FontString|nil  stock name (alpha-zeroed when our name element is active)
   "HealthTexts",          -- (frameID) -> { FontString, ... }  stock health strings (alpha-zeroed)
   "PowerTexts",           -- (frameID) -> { FontString, ... }  stock power strings (alpha-zeroed)
   "StockLevelRegions",    -- (frameID) -> { Region, ... }      stock level text + its circle art (alpha-zeroed)
   "NameBackground",       -- (frameID) -> Texture|nil     reaction-coloured strip (target); our 'nameplate' slot
-  "MovableBars",          -- (frameID) -> { [StatusBar]=true }  bars the R2 exception may SetHeight/SetPoint (Era only)
-  "BarSlot",              -- (frameID, kind) -> Region     the rect the overlay bar fills: Forever = the masked container
-                          --                                (HealthBarsContainer), else the bar itself
-  "BarMask",              -- (frameID, kind) -> MaskTexture|nil  stock mask to apply to our overlay fill (Forever)
+  "MovableBars",          -- (frameID) -> { [StatusBar]=true }  stock bars Geometry may SetHeight/SetPoint (both clients;
+                          --                                SetHeight/SetPoint on the bar frames is unprotected)
   "StockValueText",       -- (frameID, kind) -> FontString|nil  Blizzard's own centre value string for that bar. On
                           --   secret-value clients our health/power elements ADOPT it (its content is secure-written),
                           --   re-anchored and re-fonted. nil on clients where we compute the number ourselves.

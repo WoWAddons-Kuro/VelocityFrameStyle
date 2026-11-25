@@ -1,4 +1,4 @@
-## Interface: 16001
+## Interface: 11509
 ## Title: Velocity Frame Style
 ## Notes: Restyles Blizzard's own unit frames (player, target, pet) with a simple text-element grid and bar styling, and adds the missing pet-target frame. Era + Forever.
 ## Author: Kuro
@@ -27,9 +27,11 @@ Core\TextLayout.lua
 Core\Geometry.lua
 
 Frames\FrameBase.lua
+Frames\Chrome.lua
 Frames\Player.lua
 Frames\Target.lua
 Frames\Pet.lua
+Frames\ToT.lua
 Frames\PetTarget.lua
 Frames\PetTargetVisibility.lua
 

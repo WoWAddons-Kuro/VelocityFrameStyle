@@ -35,8 +35,12 @@ DB.DEFAULT_GLOBAL = {
   barTexture = "Blizzard",        -- VFS_TextureKey (Core\Textures.lua built-ins + LibSharedMedia)
   font = "Friz Quadrata TT",      -- VFS_FontKey
   fontStyle = "OUTLINE",          -- "" | OUTLINE | THICKOUTLINE | MONOCHROME
-  borderDarken = 1.0,             -- 0 = black art, 1 = stock brightness
   backingAlpha = 0.6,             -- black backdrop behind every bar
+  -- Geometric chrome (spec \u00a7Chrome): near-black disc + rounded plate; no Blizzard frame art, no border line
+  plateColor = { 0.02, 0.02, 0.02 },   -- VFS_RGB
+  plateAlpha = 0.9,
+  showCombatGlow = true,
+  combatGlowColor = { 1, 0.1, 0.1 },   -- VFS_RGB; our replacement for Blizzard's red in-combat flash
   classColorHealth = false,       -- players only
   portraitStyle = "default",      -- default | class_old | class_new
   -- pet-target extras
@@ -49,7 +53,7 @@ DB.DEFAULT_GLOBAL = {
 local function DefaultFrame()
   return {
     enabled = true,
-    override = {},                -- VFS_FrameOverrides: barTexture | font | fontStyle | borderDarken | backingAlpha | portraitStyle ; nil = inherit
+    override = {},                -- VFS_FrameOverrides: barTexture | font | fontStyle | backingAlpha | portraitStyle | plateAlpha ; nil = inherit
     elements = DefaultElements(),
   }
 end

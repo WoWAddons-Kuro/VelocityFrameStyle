@@ -44,11 +44,23 @@ VFS.ClientFlavours.classic_era = {
     elseif id == "pet" then return PetFrameManaBar
     elseif id == "pettarget" then local f = Root(id); return f and f.power end
   end,
-  FrameArt = function(id)
-    if id == "player" then return PlayerFrameTexture
-    elseif id == "target" then return TargetFrameTextureFrameTexture
-    elseif id == "pet" then return PetFrameTexture
-    elseif id == "pettarget" then local f = Root(id); return f and f.texture end
+  -- Geometric chrome: everything Blizzard draws as frame art, alpha-zeroed. Era flat names.
+  ChromeRegions = function(id)
+    if id == "player" then return List(PlayerFrameTexture, PlayerFrameFlash, PlayerStatusTexture, PlayerFrameBackground)
+    elseif id == "target" then return List(TargetFrameTextureFrameTexture, TargetFrameFlash, TargetFrameNameBackground, TargetFrameBackground)
+    elseif id == "pet" then return List(PetFrameTexture, PetFrameFlash, PetAttackModeTexture)
+    elseif id == "pettarget" then local f = Root(id); return List(f and f.texture, f and f.nameBackground) end
+    return {}
+  end,
+  -- Keep-list: rest zzz, combat swords, skull
+  KeepRegions = function(id)
+    if id == "player" then return List(PlayerRestIcon, PlayerAttackIcon)
+    elseif id == "target" then return List(TargetFrameTextureFrameHighLevelTexture) end
+    return {}
+  end,
+  ClassificationIcon = function(id)
+    if id == "target" then return TargetFrameTextureFrameHighLevelTexture end
+    if id == "pettarget" then local f = Root(id); return f and f.skull end
   end,
   Portrait = function(id)
     if id == "player" then return PlayerPortrait
@@ -96,6 +108,8 @@ VFS.ClientFlavours.classic_era = {
     end
     return out
   end,
+  -- Era: no secret values; the grid computes [hp]/[power] itself, so there is no stock string to adopt.
+  StockValueText = function() return nil end,
   HookBarUpdate = function(id, kind, fn)
     local bar = (kind == "health") and VFS.Client.HealthBar(id) or VFS.Client.PowerBar(id)
     Client.CommonHookBarUpdate(bar, fn)

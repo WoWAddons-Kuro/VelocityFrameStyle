@@ -10,11 +10,18 @@ VFS.EditMode = EditMode
 local lib, editing, registered = nil, false, false
 
 local function OnMoved(frame)
-  local point, _, _, x, y = frame:GetPoint(1)
+  -- LibEditMode anchors UIParent-relative with the same point both sides. Read what it set, persist into the ACTIVE
+  -- layout record. Guard: before LayoutProfile has resolved the layout name the record is the "Default" placeholder;
+  -- writing there is why the frame "kept appearing somewhere else" (owner 2026-11-25) - the real layout never got it.
+  if VFS.LayoutProfile and VFS.LayoutProfile.IsResolved and not VFS.LayoutProfile.IsResolved() then return end
+  local point, _, relPoint, x, y = frame:GetPoint(1)
   if not point then return end
   local p = DB.Profile().petTargetPlacement
-  p.anchorTo, p.relPoint = nil, nil
+  p.anchorTo = nil
+  p.relPoint = relPoint or point
   p.point, p.x, p.y = point, math.floor(x + 0.5), math.floor(y + 0.5)
+  -- immediately re-apply through our own path so what the lib set and what we persist can never differ
+  VFS.PetTarget.ApplyPlacement()
 end
 
 local function Register()

@@ -121,14 +121,20 @@ function PetTarget.Create()
     VFS.PetTargetVisibility.ApplySoftHide()
   end)
 
-  -- Register with FrameBase so appearance/text come from the shared machinery (bars are ours: in place)
+  -- Register with FrameBase so appearance/text come from the shared machinery (bars are ours). Geometric chrome:
+  -- bars sized to Chrome.LAYOUT.pettarget and laid LEFT of the portrait (target-style); texture/nameBackground are
+  -- ChromeRegions and go to alpha 0, the plate/disc replace them.
   local st = { id = "pettarget", unit = UNIT, button = f, bars = {}, slots = {} }
-  st.bars.health = { stock = f.health, draw = f.health, backdrop = FrameBase.AcquireBackdrop(f.health), inPlace = true }
-  st.bars.power  = { stock = f.power,  draw = f.power,  backdrop = FrameBase.AcquireBackdrop(f.power),  inPlace = true }
+  st.bars.health = { stock = f.health, backdrop = FrameBase.AcquireBackdrop(f.health), movable = true }
+  st.bars.power  = { stock = f.power,  backdrop = FrameBase.AcquireBackdrop(f.power),  movable = true }
+  local L = VFS.Chrome.LAYOUT.pettarget
+  f.health:ClearAllPoints(); f.health:SetPoint("RIGHT", f.portrait, "LEFT", -8, 4); f.health:SetSize(L.health.w, L.health.h)
+  f.power:ClearAllPoints();  f.power:SetPoint("TOPRIGHT", f.health, "BOTTOMRIGHT", 0, -1); f.power:SetSize(L.power.w, L.power.h)
   st.host = TextLayout.CreateHost(f, 5)
-  st.slots = { health = f.health, power = f.power, nameplate = f.nameBackground, above = f.health, below = f.power }
+  st.slots = { health = f.health, power = f.power, nameplate = FrameBase.NameRowAbove(st, f.health), above = f.health, below = f.power }
   VFS.Frames.pettarget = st
   PetTarget.state = st
+  VFS.Chrome.Create(st)
   FrameBase.ApplyAppearance(st)
   return f
 end

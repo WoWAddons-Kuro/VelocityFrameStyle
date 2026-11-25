@@ -34,10 +34,10 @@ local function Status()
   for _, id in ipairs(DB.FRAME_IDS) do
     local st = VFS.Frames[id]
     local hb, pb = Client.HealthBar(id), Client.PowerBar(id)
-    Util.Print("%-9s %s | health %s%s | power %s%s | art %s | name %s", id, st and "styled" or "-",
-      hb and "ok" or "MISSING", (st and st.bars.health and st.bars.health.inPlace) and " (in place)" or (st and st.bars.health and " (overlay)" or ""),
-      pb and "ok" or "MISSING", (st and st.bars.power and st.bars.power.inPlace) and " (in place)" or (st and st.bars.power and " (overlay)" or ""),
-      Client.FrameArt(id) and "ok" or "MISSING", Client.NameText(id) and "ok" or "MISSING")
+    Util.Print("%-9s %s | health %s%s | power %s%s | chrome %d regions | keep %d | name %s", id, st and "styled" or "-",
+      hb and "ok" or "MISSING", (st and st.bars.health and st.bars.health.movable) and " (sized)" or "",
+      pb and "ok" or "MISSING", (st and st.bars.power and st.bars.power.movable) and " (sized)" or "",
+      #Client.ChromeRegions(id), #Client.KeepRegions(id), Client.NameText(id) and "ok" or "MISSING")
   end
   Util.Print(VFS.EditMode.Status())
   Util.Print(VFS.PetTargetVisibility.Status())
@@ -56,8 +56,8 @@ local function DumpText(id)
   Util.Print("unit %s exists %s | enabled %s | host shown %s level %d strata %s", st.unit, tostring(UnitExists(st.unit)),
     tostring(DB.Frame(id).enabled), tostring(st.host.top:IsShown()), st.host.top:GetFrameLevel(), st.host.top:GetFrameStrata())
   for kind, bar in pairs(st.bars) do
-    Util.Print("bar %s draw level %d strata %s shown %s | stock level %d", kind, bar.draw:GetFrameLevel(), bar.draw:GetFrameStrata(),
-      tostring(bar.draw:IsShown()), bar.stock:GetFrameLevel())
+    Util.Print("bar %s level %d strata %s shown %s | movable %s", kind, bar.stock:GetFrameLevel(), bar.stock:GetFrameStrata(),
+      tostring(bar.stock:IsShown()), tostring(bar.movable))
   end
   for slot, region in pairs(st.slots) do
     local w, h = region:GetSize()
@@ -76,7 +76,7 @@ local function DumpText(id)
   Util.DumpFooter("/vfs text " .. id)
 end
 
--- /vfs rects <frame>: on-screen size of the stock bar, its container slot and our overlay, per bar.
+-- /vfs rects <frame>: on-screen size of the stock bars, portrait and our chrome shapes.
 local function DumpRects(id)
   local st = VFS.Frames[id]
   if not st then Util.Print("no frame state for %s", tostring(id)) return end
@@ -84,9 +84,10 @@ local function DumpRects(id)
   local function R(label, f) if not f then Util.Print("%-14s nil", label) return end local _, _, w, h = f:GetRect() Util.Print("%-14s %dx%d", label, math.floor((w or 0) + 0.5), math.floor((h or 0) + 0.5)) end
   R("button", st.button)
   for kind, bar in pairs(st.bars) do
-    R(kind .. ".stock", bar.stock); R(kind .. ".slot", Client.BarSlot(id, kind)); R(kind .. ".draw", bar.draw); R(kind .. ".mask", Client.BarMask(id, kind))
+    R(kind .. ".bar", bar.stock); R(kind .. ".backdrop", bar.backdrop)
   end
-  R("nameBackground", Client.NameBackground(id)); R("art", Client.FrameArt(id)); R("portrait", Client.Portrait(id))
+  R("portrait", Client.Portrait(id))
+  if st.chrome then R("chrome.disc", st.chrome.disc); R("chrome.plate", st.chrome.plate) end
   Util.DumpFooter("/vfs rects " .. id)
 end
 
@@ -104,6 +105,50 @@ local function DumpValues(id)
   Util.DumpFooter("/vfs values " .. id)
 end
 
+-- /vfs layers <frame>: every region/frame under the unit button that overlaps the health bar rect, in draw order
+-- (strata, frame level, layer, sublevel), with alpha/shown. Finds "what is drawn over our bar".
+local LAYER_ORDER = { BACKGROUND = 0, BORDER = 1, ARTWORK = 2, OVERLAY = 3, HIGHLIGHT = 4 }
+local function DumpLayers(id)
+  local st = VFS.Frames[id]
+  if not st or not st.bars.health then Util.Print("no health bar for %s", tostring(id)) return end
+  local hb = st.bars.health.stock
+  local l, b, w, h = hb:GetRect()
+  if not l then Util.Print("bar has no rect") return end
+  local r, t = l + w, b + h
+  local rows = {}
+  local visited, visits = {}, 0
+  local function Overlaps(x) local xl, xb, xw, xh = x:GetRect(); if not xl or not xw or xw == 0 then return false end return xl < r and xl + xw > l and xb < t and xb + xh > b end
+  local function Walk(frame, depth)
+    if depth > 6 or visited[frame] or visits > 400 then return end
+    visited[frame] = true; visits = visits + 1
+    -- skip our own frames (overlay, backdrop, text host): we know what they draw
+    if frame == hb or frame == st.bars.health.backdrop or frame == st.host.top or (st.bars.power and (frame == st.bars.power.stock or frame == st.bars.power.backdrop)) then return end
+    for i = 1, select("#", frame:GetRegions()) do
+      local reg = select(i, frame:GetRegions())
+      if reg:IsShown() and Overlaps(reg) and reg:GetObjectType() ~= "MaskTexture" then
+        local layer, sub = reg:GetDrawLayer()
+        local what
+        if reg:GetObjectType() == "FontString" then what = "text:" .. tostring(reg:GetText()):sub(1, 12)
+        else
+          local okA, atlas = pcall(reg.GetAtlas, reg); local okT, tex = pcall(reg.GetTexture, reg)
+          what = (okA and atlas) or (okT and tostring(tex)) or reg:GetObjectType()
+        end
+        local vr, vg, vb, va = 1, 1, 1, 1; if reg.GetVertexColor then vr, vg, vb, va = reg:GetVertexColor() end
+        rows[#rows + 1] = { k = frame:GetFrameLevel() * 10 + (LAYER_ORDER[layer] or 0) + (sub or 0) / 10, s = string.format("L%d %s%+d a=%.2f vc=%.1f,%.1f,%.1f,%.1f %s <%s>", frame:GetFrameLevel(), layer, sub or 0, reg:GetAlpha(), vr or 1, vg or 1, vb or 1, va or 1, what, (frame:GetName() or reg:GetName() or (frame.GetDebugName and frame:GetDebugName()) or "?")) }
+      end
+    end
+    for i = 1, select("#", frame:GetChildren()) do
+      local c = select(i, frame:GetChildren())
+      if c:IsShown() and c:GetFrameStrata() == hb:GetFrameStrata() then Walk(c, depth + 1) end
+    end
+  end
+  Walk(st.button, 0)
+  table.sort(rows, function(x, y) return x.k < y.k end)
+  Util.DumpHeader(string.format("/vfs layers %s (health bar level %d, backdrop level %d)", id, hb:GetFrameLevel(), st.bars.health.backdrop:GetFrameLevel()))
+  for _, row in ipairs(rows) do Util.Print(row.s) end
+  Util.DumpFooter("/vfs layers " .. id)
+end
+
 local function Slash(msg)
   msg = (msg or ""):lower():match("^%s*(.-)%s*$")
   local cmd, arg = msg:match("^(%S+)%s*(%S*)$")
@@ -111,6 +156,7 @@ local function Slash(msg)
   elseif cmd == "text" then DumpText(arg ~= "" and arg or "player")
   elseif cmd == "rects" then DumpRects(arg ~= "" and arg or "player")
   elseif cmd == "values" then DumpValues(arg ~= "" and arg or "player")
+  elseif cmd == "layers" then DumpLayers(arg ~= "" and arg or "player")
   elseif msg == "editmode" or msg == "edit" then VFS.EditMode.Open()
   elseif msg == "restyle" then VFS.FrameBase.RestyleAll(); Util.Print("restyled")
   else VFS.Options.Open() end
@@ -145,6 +191,7 @@ local function OnEvent(_, event, arg1, arg2)
       Stage("Player", VFS.Player.Create)
       Stage("Target", VFS.Target.Create)
       Stage("Pet", VFS.Pet.Create)
+      Stage("ToT", VFS.ToT.Create)
     end
     if VFS.standDownPetTarget then
       Util.Print("pet-target frame off: %s already provides one.", VFS.standDownPetTarget)
@@ -156,6 +203,7 @@ local function OnEvent(_, event, arg1, arg2)
     end
     Stage("Options", VFS.Options.Create)
     f:RegisterEvent("PLAYER_REGEN_ENABLED")
+    f:RegisterEvent("PLAYER_REGEN_DISABLED")
     f:RegisterEvent("PLAYER_TARGET_CHANGED")
     f:RegisterEvent("PLAYER_ENTERING_WORLD")
     f:RegisterEvent("PLAYER_LEVEL_UP")
@@ -167,6 +215,7 @@ local function OnEvent(_, event, arg1, arg2)
     f:RegisterUnitEvent("UNIT_LEVEL", "player", "target", "pet", "pettarget")
     f:RegisterUnitEvent("UNIT_NAME_UPDATE", "player", "target", "pet", "pettarget")
     f:RegisterUnitEvent("UNIT_FACTION", "target", "pettarget")
+    f:RegisterUnitEvent("UNIT_FLAGS", "player", "target", "pet", "pettarget")   -- in-combat flag -> our glow
     f:RegisterUnitEvent("UNIT_CLASSIFICATION_CHANGED", "target", "pettarget")
     Util.Print("loaded (%s). /vfs for options, /vfs status for details", Client.flavour)
   elseif event == "ADDON_ACTION_BLOCKED" or event == "ADDON_ACTION_FORBIDDEN" then
@@ -176,6 +225,10 @@ local function OnEvent(_, event, arg1, arg2)
     end
   elseif event == "PLAYER_REGEN_ENABLED" then
     VFS.PetTargetVisibility.OnRegenEnabled()
+    -- our combat glow follows the player's combat state on every frame we style
+    for _, st in pairs(VFS.Frames) do VFS.FrameBase.OnCombatChanged(st) end
+  elseif event == "PLAYER_REGEN_DISABLED" then
+    for _, st in pairs(VFS.Frames) do VFS.FrameBase.OnCombatChanged(st) end
   elseif event == "UNIT_TARGET" then
     if VFS.PetTarget.frame then VFS.PetTarget.OnPetTargetChanged(); VFS.PetTargetVisibility.ApplySoftHide() end
   elseif event == "UNIT_PET" then

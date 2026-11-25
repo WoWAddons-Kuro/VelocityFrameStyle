@@ -5,12 +5,13 @@ local ADDON_NAME, VFS = ...
 local Client, Util = VFS.Client, VFS.Util
 local P = Client.Path
 
-local UNITS = { player = "player", target = "target", pet = "pet", pettarget = "pettarget" }
+local UNITS = { player = "player", target = "target", pet = "pet", pettarget = "pettarget", tot = "targettarget" }
 
 local function Root(id)
   if id == "player" then return PlayerFrame
   elseif id == "target" then return TargetFrame
   elseif id == "pet" then return PetFrame
+  elseif id == "tot" then return TargetFrameToT
   elseif id == "pettarget" then return VFS.PetTarget and VFS.PetTarget.frame end
 end
 
@@ -53,44 +54,76 @@ VFS.ClientFlavours.forever = {
     if id == "player" then return P(PlayerMain(), "HealthBarsContainer.HealthBar")
     elseif id == "target" then return P(TargetMain(), "HealthBarsContainer.HealthBar")
     elseif id == "pet" then return PetFrameHealthBar
+    elseif id == "tot" then return TargetFrameToT and TargetFrameToT.HealthBar
     elseif id == "pettarget" then local f = Root(id); return f and f.health end
   end,
   PowerBar = function(id)
     if id == "player" then return P(PlayerMain(), "ManaBarArea.ManaBar")
     elseif id == "target" then return P(TargetMain(), "ManaBar")
     elseif id == "pet" then return PetFrameManaBar
+    elseif id == "tot" then return TargetFrameToT and TargetFrameToT.ManaBar
     elseif id == "pettarget" then local f = Root(id); return f and f.power end
   end,
-  FrameArt = function(id)
-    if id == "player" then return P(PlayerFrame, "PlayerFrameContainer.FrameTexture")
-    elseif id == "target" then return P(TargetFrame, "TargetFrameContainer.FrameTexture")
-    elseif id == "pet" then return PetFrameTexture
-    elseif id == "pettarget" then local f = Root(id); return f and f.texture end
+  -- Geometric chrome (spec): every Blizzard art region we alpha-zero. The frame texture, flashes, status glow, level
+  -- circle, reaction strip, the health container's black Background and the loss bars. Masks are not regions we touch.
+  ChromeRegions = function(id)
+    if id == "player" then
+      local c, m = P(PlayerFrame, "PlayerFrameContainer"), PlayerMain()
+      local hc = P(m, "HealthBarsContainer")
+      return List(c and c.FrameTexture, c and c.FrameFlash, c and c.VehicleFrameTexture, c and c.AlternatePowerFrameTexture,
+        m and m.StatusTexture, m and m.LevelBackgroundCircle,
+        hc and hc.Background, hc and hc.HealthBar and hc.HealthBar.Background,
+        hc and hc.PlayerFrameTempMaxHealthLoss, hc and hc.PlayerFrameHealthBarAnimatedLoss,
+        P(PlayerFrame, "PlayerFrameContent.PlayerFrameContentContextual.PlayerPortraitCornerIcon"))
+    elseif id == "target" then
+      local c, m = P(TargetFrame, "TargetFrameContainer"), TargetMain()
+      local hc = P(m, "HealthBarsContainer")
+      return List(c and c.FrameTexture, c and c.Flash, c and c.BossPortraitFrameTexture,
+        m and m.ReputationColor, m and m.LevelBackgroundCircle,
+        hc and hc.Background, hc and hc.HealthBar and hc.HealthBar.Background, hc and hc.TempMaxHealthLoss)
+    elseif id == "pet" then
+      return List(PetFrameTexture, PetFrameFlash, PetAttackModeTexture)
+    elseif id == "tot" then
+      local t = TargetFrameToT; return List(t and t.FrameTexture)
+    elseif id == "pettarget" then
+      local f = Root(id); return List(f and f.texture, f and f.nameBackground)
+    end
+    return {}
   end,
-  -- The frame whose BORDER art has the transparent bar window. Player/Target: the *Container child frame.
-  -- Pet: PetFrameTexture sits on PetFrame itself. Our bars go one level under this frame.
-  ChromeFrame = function(id)
-    if id == "player" then return P(PlayerFrame, "PlayerFrameContainer")
-    elseif id == "target" then return P(TargetFrame, "TargetFrameContainer")
-    elseif id == "pet" then return PetFrame
-    elseif id == "pettarget" then local f = Root(id); return f and f.art end
+  -- Blizzard art that STAYS (owner keep-list): rest zzz, combat swords, classification skull / dragons.
+  KeepRegions = function(id)
+    if id == "player" then
+      local x = P(PlayerFrame, "PlayerFrameContent.PlayerFrameContentContextual")
+      return List(x and x.PlayerRestLoop, x and x.AttackIcon)
+    elseif id == "target" then
+      local x = TargetContextual()
+      return List(x and x.HighLevelTexture, x and x.BossIcon)
+    end
+    return {}
+  end,
+  ClassificationIcon = function(id)
+    if id == "target" then return P(TargetContextual(), "HighLevelTexture") end
+    if id == "pettarget" then local f = Root(id); return f and f.skull end
   end,
   Portrait = function(id)
     if id == "player" then return P(PlayerFrame, "PlayerFrameContainer.PlayerPortrait")
     elseif id == "target" then return P(TargetFrame, "TargetFrameContainer.Portrait")
     elseif id == "pet" then return PetPortrait
+    elseif id == "tot" then return TargetFrameToT and TargetFrameToT.Portrait
     elseif id == "pettarget" then local f = Root(id); return f and f.portrait end
   end,
   NameText = function(id)
     if id == "player" then return PlayerName
     elseif id == "target" then return P(TargetMain(), "Name")
     elseif id == "pet" then return PetName
+    elseif id == "tot" then return TargetFrameToT and TargetFrameToT.Name
     elseif id == "pettarget" then local f = Root(id); return f and f.name end
   end,
   HealthTexts = function(id)
     if id == "player" then local c = P(PlayerMain(), "HealthBarsContainer"); return List(c and c.HealthBarText, c and c.LeftText, c and c.RightText)
     elseif id == "target" then local c = P(TargetMain(), "HealthBarsContainer"); return List(c and c.HealthBarText, c and c.LeftText, c and c.RightText, c and c.DeadText)
     elseif id == "pet" then return List(PetFrameHealthBarText, PetFrameHealthBarTextLeft, PetFrameHealthBarTextRight)
+    elseif id == "tot" then local t = TargetFrameToT; return List(t and t.DeadText, t and t.HealthBar and t.HealthBar.TextString)
     elseif id == "pettarget" then local f = Root(id); return List(f and f.healthText, f and f.deadText) end
     return {}
   end,
@@ -98,6 +131,7 @@ VFS.ClientFlavours.forever = {
     if id == "player" then local m = P(PlayerMain(), "ManaBarArea.ManaBar"); return List(m and m.ManaBarText, m and m.LeftText, m and m.RightText)
     elseif id == "target" then local m = P(TargetMain(), "ManaBar"); return List(m and m.ManaBarText, m and m.LeftText, m and m.RightText)
     elseif id == "pet" then return List(PetFrameManaBarText, PetFrameManaBarTextLeft, PetFrameManaBarTextRight)
+    elseif id == "tot" then local t = TargetFrameToT; return List(t and t.ManaBar and t.ManaBar.TextString)
     elseif id == "pettarget" then local f = Root(id); return List(f and f.powerText) end
     return {}
   end,
@@ -111,26 +145,17 @@ VFS.ClientFlavours.forever = {
     if id == "target" then return P(TargetMain(), "ReputationColor")
     elseif id == "pettarget" then local f = Root(id); return f and f.nameBackground end
   end,
-  MovableBars = function() return {} end,   -- Forever: never move stock bars (masked, restricted); overlay strategy
-  -- Camelot overrides size the HEALTH BAR taller than its container and clip it with a mask (PlayerFrame: 20 px bar
-  -- in a 15 px container, TargetFrame: bar +3 px). The visible slot is the CONTAINER rect; our overlay fills that.
-  BarSlot = function(id, kind)
-    if kind == "health" then
-      if id == "player" then return P(PlayerMain(), "HealthBarsContainer") end
-      if id == "target" then return P(TargetMain(), "HealthBarsContainer") end
+  -- Geometric chrome (spec): the stock bars are ours to size and anchor on Forever too. SetHeight/SetPoint on the
+  -- bar frames is unprotected (EasyFrames-Forever does exactly this); only MEASURING a few restricted regions is not.
+  -- pettarget bars are ours already and are placed by Frames\PetTarget.lua.
+  MovableBars = function(id)
+    local out = {}
+    if id ~= "pettarget" then
+      local h, p = VFS.Client.HealthBar(id), VFS.Client.PowerBar(id)
+      if h then out[h] = true end
+      if p then out[p] = true end
     end
-    return (kind == "health") and VFS.Client.HealthBar(id) or VFS.Client.PowerBar(id)
-  end,
-  BarMask = function(id, kind)
-    if kind == "health" then
-      if id == "player" then return P(PlayerMain(), "HealthBarsContainer.HealthBarMask") end
-      if id == "target" then return P(TargetMain(), "HealthBarsContainer.HealthBarMask") end
-      if id == "pet" then return PetFrameHealthBarMask end
-    else
-      if id == "player" then return P(PlayerMain(), "ManaBarArea.ManaBar.ManaBarMask") end
-      if id == "target" then return P(TargetMain(), "ManaBar.ManaBarMask") end
-      if id == "pet" then return PetFrameManaBarMask end
-    end
+    return out
   end,
   -- Blizzard writes these from secure code with the game's own abbreviation; their content is a secret on Forever,
   -- so we never read it - we re-anchor and re-font the string itself (R5 coping pattern from PlateStyle).
