@@ -21,6 +21,9 @@ VFS.Frames = {}     -- VFS_FrameID -> VFS_FrameState
 -- later must not change any bar sizing, placement, background or value handling.
 FrameBase.BAR_BORDER_WIDTH = 6
 function FrameBase.CreateSurfaceBorder(parent, surface, thickness)
+  if VFS.RoundedBorder and thickness == VFS.RoundedBorderAtlas.thickness then
+    return VFS.RoundedBorder.Create(parent, surface)
+  end
   local border = CreateFrame("Frame", nil, parent)
   border:EnableMouse(false)
   border:SetPoint("TOPLEFT", surface, "TOPLEFT", -thickness, thickness)

@@ -26,6 +26,8 @@ Core\Format.lua
 Core\TextLayout.lua
 Core\Geometry.lua
 
+Assets\RoundedBorderAtlas.lua
+Frames\RoundedBorder.lua
 Frames\FrameBase.lua
 Frames\Chrome.lua
 Frames\Player.lua
