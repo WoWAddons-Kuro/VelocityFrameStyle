@@ -313,6 +313,9 @@ function FrameBase.EnsureBarHeadroom(st, by)
   if not by or by <= 0 or st.barHeadroomApplied then return end
   st.barHeadroomApplied = by
   for _, bar in pairs(st.bars) do bar.stock:SetFrameLevel(bar.stock:GetFrameLevel() + by) end
+  -- The lift ran inside a sync that holds the reentrancy guard; re-run the audit explicitly once it is released.
+  st.syncingAdornment = nil
+  FrameBase.SyncAdornmentLevels(st)
 end
 
 -- THE level audit, in one place (owner, Era 2026-11-25, measured with /vfs stack):
@@ -335,6 +338,10 @@ function FrameBase.SyncAdornmentLevels(st)
   if st.chrome and st.chrome.glow then
     for _, ring in pairs(st.chrome.glow.rings or {}) do floor = math.max(floor, ring:GetFrameLevel() + 1) end
   end
+  -- The text host must ALSO clear every bar, independently of the badge: after EnsureBarHeadroom lifted the Era bars
+  -- by 3, host.top (set once at Acquire from the ORIGINAL bar level) ended up level with the bars and the health
+  -- value vanished under the fill (owner 2026-11-25). Raise it to the same floor first; never lower it.
+  if st.host.top:GetFrameLevel() < floor then st.host.top:SetFrameLevel(floor) end
   adornment:SetFrameStrata(st.host.top:GetFrameStrata())
   adornment:SetFrameLevel(math.max(floor, st.host.top:GetFrameLevel() - 1))
   if st.portraitBadge then st.portraitBadge:SetFrameLevel(adornment:GetFrameLevel()) end
