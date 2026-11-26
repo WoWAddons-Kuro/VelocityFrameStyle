@@ -2,6 +2,7 @@
 
 **Owner-approved direction, 2026-11-25.** Implement incrementally; checkboxes below are not yet complete.
 **Start here next session.** Detailed findings: [07_Client_Interface_Era_Readiness_Review.md](07_Client_Interface_Era_Readiness_Review.md).
+**Short tracking list (what is left, one line each): [09_TODO.md](09_TODO.md).**
 
 ## Baseline and decisions
 

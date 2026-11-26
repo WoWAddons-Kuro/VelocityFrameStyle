@@ -41,6 +41,7 @@ local function Status()
   end
   Util.Print(VFS.EditMode.Status())
   Util.Print(VFS.PetTargetVisibility.Status())
+  if VFS.PetHappinessPanel and VFS.features["PetHappinessPanel"] then Util.Print(VFS.PetHappinessPanel.Status()) end
   local feats = {}
   for k, v in pairs(VFS.features) do feats[#feats + 1] = k .. "=" .. tostring(v) end
   table.sort(feats)
@@ -154,6 +155,40 @@ local function DumpLayers(id)
   Util.DumpHeader(string.format("/vfs layers %s (health bar level %d, backdrop level %d)", id, hb:GetFrameLevel(), st.bars.health.backdrop:GetFrameLevel()))
   for _, row in ipairs(rows) do Util.Print(row.s) end
   Util.DumpFooter("/vfs layers " .. id)
+end
+
+-- /vfs stack <frame>: the frame levels of every piece of OUR portrait/adornment stack vs the bars, with each frame's
+-- parent chain to the button. Answers "why is X under Y" with numbers instead of guesses (owner 2026-11-25: Target
+-- badge still under the bars after the audited stack).
+local function DumpStack(id)
+  local st = VFS.Frames[id]
+  if not st then Util.Print("no frame state for %s", tostring(id)) return end
+  local portrait = Client.Portrait(id)
+  local function Chain(f)
+    local parts = {}
+    local p = f
+    for _ = 1, 6 do
+      if not p then break end
+      parts[#parts + 1] = string.format("%s[%s L%d]", (p:GetName() or p.GetDebugName and p:GetDebugName() or "?"):sub(-28), p:GetFrameStrata(), p:GetFrameLevel())
+      if p == st.button or p == UIParent then break end
+      p = p:GetParent()
+    end
+    return table.concat(parts, " < ")
+  end
+  Util.DumpHeader("/vfs stack " .. id)
+  Util.Print("button        %s", Chain(st.button))
+  if st.chrome then Util.Print("holder        %s", Chain(st.chrome.holder)); Util.Print("glowFrame     %s", Chain(st.chrome.glow.frame)) end
+  if st.portraitLayer then Util.Print("portraitLayer %s", Chain(st.portraitLayer)) end
+  if portrait then Util.Print("portrait tex  parent=%s layer=%s", Chain(portrait:GetParent()), (portrait:GetDrawLayer())) end
+  for kind, bar in pairs(st.bars) do
+    Util.Print("bar %-7s   %s", kind, Chain(bar.stock))
+    Util.Print("  backdrop    %s", Chain(bar.backdrop)); Util.Print("  ring        %s", Chain(bar.backdrop.ring))
+    if st.chrome and st.chrome.glow.rings[kind] then Util.Print("  glow ring   %s", Chain(st.chrome.glow.rings[kind])) end
+  end
+  if st.adornment then Util.Print("adornment     %s", Chain(st.adornment)) end
+  if st.portraitBadge then Util.Print("badge         %s shown=%s", Chain(st.portraitBadge), tostring(st.portraitBadge:IsShown())) end
+  Util.Print("host.top      %s", Chain(st.host.top))
+  Util.DumpFooter("/vfs stack " .. id)
 end
 
 -- Read-only: distinguish secret capacity from stale/independent power visuals.
@@ -292,6 +327,7 @@ local function Slash(msg)
       C_Timer.After(math.min(delay, 10), DumpPredictions)
     else DumpPredictions() end
   elseif cmd == "layers" then DumpLayers(arg ~= "" and arg or "player")
+  elseif cmd == "stack" then DumpStack(arg ~= "" and arg or "target")
   elseif msg == "editmode" or msg == "edit" then VFS.EditMode.Open()
   elseif msg == "restyle" then VFS.FrameBase.RestyleAll(); Util.Print("restyled")
   else VFS.Options.Open() end
@@ -327,6 +363,8 @@ local function OnEvent(_, event, arg1, arg2)
       Stage("Target", VFS.Target.Create)
       Stage("Pet", VFS.Pet.Create)
       Stage("ToT", VFS.ToT.Create)
+      -- Era hunter pets only; Setup is a no-op where Client.PetHappinessFrame() is nil (Forever).
+      Stage("PetHappinessPanel", VFS.PetHappinessPanel.Setup)
     end
     if VFS.standDownPetTarget then
       Util.Print("pet-target frame off: %s already provides one.", VFS.standDownPetTarget)

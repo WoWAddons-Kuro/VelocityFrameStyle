@@ -274,7 +274,10 @@ function FrameBase.PortraitBadge(st)
   function badge:ApplyColors()
     local g = DB.Global()
     local c = g.plateColor or { 0.02, 0.02, 0.02 }
-    self.disc:SetVertexColor(c[1], c[2], c[3], g.plateAlpha or 0.9)   -- same plate as the portrait disc
+    -- OPAQUE, never plateAlpha. Frame levels already put the badge above the bars (verified with /vfs stack: badge L4 >
+    -- bars L1 on Target), but at 90% a near-black disc over a saturated green fill reads as a dark-green tint, i.e.
+    -- "the bar is on top" (owner, Era 2026-11-25, three rounds of chasing levels). A level badge is solid.
+    self.disc:SetVertexColor(c[1], c[2], c[3], 1)
     self.ring:SetVertexColor(0, 0, 0, 1)                               -- opaque black, like the bar borders
     adornment.rim:SetVertexColor(0, 0, 0, 1)
   end
@@ -302,16 +305,28 @@ function FrameBase.AttachPortraitRim(st, portraitLayer)
   rim:Show()
 end
 
--- THE level audit, in one place (owner, Era 2026-11-25: level badge above EVERYTHING incl. both glows):
---   portrait's parent  <  bars  <  bar glow rings  <  adornment (rim + badge)  <  host.top (text)
--- Re-run after anything that reparents or relevels the portrait (Chrome), the bars, the text host (predictions raise
--- it) or on every appearance pass.
+-- Chrome needs N free frame levels UNDER the lowest bar backdrop for the portrait group (plate, portrait, glow). Era
+-- gives the bars L1 with backdrops at L0, so there is no room: lift every bar - and with it its backdrop (bar-1) and
+-- ring (bar+offset) via the SetFrameLevel hooks AcquireBackdrop installed - by `by` levels. Relative, once, at
+-- creation, before anything measures the bars. This is the ONLY place we change a Blizzard bar's frame level.
+function FrameBase.EnsureBarHeadroom(st, by)
+  if not by or by <= 0 or st.barHeadroomApplied then return end
+  st.barHeadroomApplied = by
+  for _, bar in pairs(st.bars) do bar.stock:SetFrameLevel(bar.stock:GetFrameLevel() + by) end
+end
+
+-- THE level audit, in one place (owner, Era 2026-11-25, measured with /vfs stack):
+--   portrait group (plate < portrait+rim < glow)  <  bar backdrops  <  bars  <  bar rings  <  bar glow rings
+--   <  adornment (badge)  <  host.top (text)
+-- The badge floor is the highest of: every bar's glow ring + 1 (which already sits above that bar's upper border).
+-- The portrait's parent is deliberately NOT a floor any more: it lives below the bars by design.
+-- Re-run after anything relevels the bars (Blizzard, predictions, EnsureBarHeadroom), the text host, or on every
+-- appearance pass.
 function FrameBase.SyncAdornmentLevels(st)
   local adornment, portrait = st.adornment, Client.Portrait(st.id)
   if not adornment or not portrait or st.syncingAdornment then return end
   st.syncingAdornment = true
-  local portraitParent = portrait:GetParent()
-  local floor = (portraitParent and portraitParent.GetFrameLevel) and (portraitParent:GetFrameLevel() + 1) or 0
+  local floor = 0
   -- Above every bar, its upper border ring and its combat glow ring (bar + borderOffset + 1).
   for _, bar in pairs(st.bars) do
     local stock = bar.stock

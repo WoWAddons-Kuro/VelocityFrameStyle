@@ -45,6 +45,8 @@ DB.DEFAULT_GLOBAL = {
   -- pet-target extras
   petTargetHealthOnly = true,
   petTargetFlashOnNew = true,
+  -- Era hunter pets: hover panel on the happiness icon / pet level badge (SPECS/10)
+  petHappinessPanel = true,
 }
 
 -- VFS_FrameSettings

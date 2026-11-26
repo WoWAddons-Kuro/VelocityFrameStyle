@@ -47,11 +47,12 @@ function Chrome.Create(st)
   local portrait = Client.Portrait(st.id)
   local hb = st.bars.health and st.bars.health.stock
   if not hb then return nil end
-  -- Holder BELOW the stock bars (bar level - 2) so bars and their backdrops draw above the plate
+  -- Holder for the plate disc. Its level (and the portrait layer's and the glow's) is set by SyncPortraitLayer below,
+  -- stacked DOWN from the lowest bar backdrop; the initial value here is a placeholder.
   local holder = CreateFrame("Frame", nil, button)
   holder:SetAllPoints(button)
   holder:SetFrameStrata(hb:GetFrameStrata())
-  holder:SetFrameLevel(math.max(0, hb:GetFrameLevel() - 3))
+  holder:SetFrameLevel(0)
 
   -- Disc (BACKGROUND) and soft rim behind it
   local discSoft = holder:CreateTexture(nil, "BACKGROUND", nil, -8)
@@ -70,7 +71,7 @@ function Chrome.Create(st)
   -- them live on glowFrame, whose alpha the bounce animation drives.
   local glowFrame = CreateFrame("Frame", nil, holder)
   glowFrame:SetAllPoints(holder)
-  glowFrame:SetFrameLevel(holder:GetFrameLevel() + 2)
+  glowFrame:SetFrameLevel(2)   -- placeholder; SyncPortraitLayer sets the real level
   local gDisc = glowFrame:CreateTexture(nil, "ARTWORK"); gDisc:SetTexture(SOFT_DISC()); gDisc:SetBlendMode("ADD")
   glowFrame:SetAlpha(0)
   local anim = glowFrame:CreateAnimationGroup()
@@ -93,43 +94,45 @@ function Chrome.Create(st)
     rings[kind] = ring
   end
 
-  -- THE FRAME-LEVEL STACK (owner, Era 2026-11-25). Texture draw layers cannot beat a higher frame level, so order is
-  -- fixed with frame levels, lowest first:
-  --   holder (plate disc)  <  glowFrame (portrait rim glow)  <  portraitLayer (portrait)  <  BARS + their borders
-  --   <  bar glow rings  <  adornment (portrait rim + level badge)  <  host.top (text)
-  -- The portrait therefore tucks UNDER the health/power bars where they overlap it, and the level badge sits above
-  -- everything including both glows. Blizzard owns the bars' levels, so the portrait layer is pinned BELOW the lowest
-  -- bar (and above the glow), and FrameBase.SyncAdornmentLevels pins the adornment above the highest glow ring.
-  -- The portrait keeps its original visibility parent and anchors; only its drawing parent moves.
+  -- THE FRAME-LEVEL STACK (owner, Era 2026-11-25, measured with /vfs stack). Texture draw layers cannot beat a higher
+  -- frame level, so order is fixed with frame levels, lowest first:
+  --   holder (plate disc)  <  portraitLayer (portrait + black rim)  <  glowFrame (portrait rim glow)
+  --   <  LOWEST BAR BACKDROP  <  bars  <  bar rings  <  bar glow rings  <  adornment (badge)  <  host.top (text)
+  -- EVERYTHING in the portrait group - plate disc, portrait, its rim, its glow - lives BELOW the lowest bar backdrop,
+  -- so the bars and the name banner always cover it. The earlier rule "portrait above glow, glow above holder" let the
+  -- portrait float ABOVE the bars whenever Blizzard's bar level was low (Era: bars L1, backdrops L0): the pin was a
+  -- no-op. Now the ceiling is the bar backdrop and the group is stacked DOWN from it. Levels can't go below 0, so when
+  -- the backdrop is at 0 the group collapses onto 0 and relies on draw layers (plate BACKGROUND-8/-7, portrait BORDER,
+  -- rim ARTWORK+7, glow disc ARTWORK on its own frame) - still under the backdrop's BACKGROUND-8 surface? No: equal
+  -- frame level, so we raise the BARS instead: FrameBase.EnsureBarHeadroom lifts every bar (and its backdrop/ring) by
+  -- the shortfall ONCE at creation, before anything else measures them. That is the only Blizzard level we touch and it
+  -- is a relative bump, not an absolute value. The portrait keeps its original visibility parent and anchors.
   if portrait then
     local originalParent = portrait:GetParent()
     local portraitLayer = CreateFrame("Frame", nil, originalParent)
     portraitLayer:SetAllPoints(originalParent)
     portraitLayer:EnableMouse(false)
     st.portraitLayer = portraitLayer
-    local function LowestBarLevel()
+    local function LowestBarBackdropLevel()
       local lowest
       for _, bar in pairs(st.bars) do
-        local lvl = bar.stock:GetFrameLevel()
-        -- A bar's lower border (backdrop) sits at bar - 1; the portrait must be under THAT too.
-        if bar.stock.vfsBackdrop then lvl = math.min(lvl, bar.stock.vfsBackdrop:GetFrameLevel()) end
+        local lvl = bar.stock.vfsBackdrop and bar.stock.vfsBackdrop:GetFrameLevel() or bar.stock:GetFrameLevel()
         if not lowest or lvl < lowest then lowest = lvl end
       end
       return lowest
     end
+    -- The portrait group needs 3 levels under the lowest bar backdrop: holder, portraitLayer, glowFrame.
+    local GROUP = 3
     local function SyncPortraitLayer()
-      portraitLayer:SetFrameStrata(glowFrame:GetFrameStrata())
-      local above = math.max(originalParent:GetFrameLevel() + 1, glowFrame:GetFrameLevel() + 1)
-      local below = LowestBarLevel()
-      -- Prefer just under the bars; never drop below the glow (then the glow would cover the portrait).
-      portraitLayer:SetFrameLevel(below and math.max(above, below - 1) or above)
-      if below and portraitLayer:GetFrameLevel() >= below then
-        -- No room between glow and bars: push the bars' stack up by raising nothing of Blizzard's - instead sink
-        -- holder+glow one step so the portrait fits under the bars.
-        holder:SetFrameLevel(math.max(0, holder:GetFrameLevel() - 1))
-        glowFrame:SetFrameLevel(holder:GetFrameLevel() + 2)
-        portraitLayer:SetFrameLevel(math.max(glowFrame:GetFrameLevel() + 1, below - 1))
+      local ceiling = LowestBarBackdropLevel() or (hb:GetFrameLevel())
+      if ceiling < GROUP then
+        VFS.FrameBase.EnsureBarHeadroom(st, GROUP - ceiling)
+        ceiling = LowestBarBackdropLevel() or hb:GetFrameLevel()
       end
+      local strata = hb:GetFrameStrata()
+      holder:SetFrameStrata(strata);        holder:SetFrameLevel(ceiling - 3)
+      portraitLayer:SetFrameStrata(strata); portraitLayer:SetFrameLevel(ceiling - 2)
+      glowFrame:SetFrameStrata(strata);     glowFrame:SetFrameLevel(ceiling - 1)
       -- Everything painted over the portrait (rim, level badge) must follow it up: one audited sync in FrameBase.
       VFS.FrameBase.SyncAdornmentLevels(st)
     end
@@ -138,9 +141,7 @@ function Chrome.Create(st)
     -- The black rim rides the same layer as the portrait so it tucks under the bars with it.
     VFS.FrameBase.AttachPortraitRim(st, portraitLayer)
     VFS.FrameBase.SyncAdornmentLevels(st)
-    hooksecurefunc(glowFrame, "SetFrameLevel", SyncPortraitLayer)
-    hooksecurefunc(glowFrame, "SetFrameStrata", SyncPortraitLayer)
-    hooksecurefunc(originalParent, "SetFrameLevel", SyncPortraitLayer)
+    st.syncPortraitLayer = SyncPortraitLayer
     for _, bar in pairs(st.bars) do hooksecurefunc(bar.stock, "SetFrameLevel", SyncPortraitLayer) end
   end
 

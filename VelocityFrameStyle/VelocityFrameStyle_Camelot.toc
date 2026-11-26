@@ -7,7 +7,7 @@
 ## OptionalDeps: LibStub, LibEditMode, LibSharedMedia-3.0
 ## IconTexture: Interface\AddOns\VelocityFrameStyle\Assets\VelocityFrameStyle_Icon.tga
 ## X-Website: https://github.com/WoWAddons-Kuro/VelocityFrameStyle
-## X-Credits: Frame geometry reference: Easy Frames (BSD, Mirmidonis / Usoltsev). Pet-target idea: Lazy Thom's PetTarget.
+## X-Credits: Frame geometry reference: Easy Frames (BSD, Mirmidonis / Usoltsev). Pet-target idea: Lazy Thom's PetTarget. Pet happiness model: HunterPetHappiness (Beleriand).
 
 Libs\LibStub\LibStub.lua
 Libs\LibEditMode\embed.xml
@@ -25,6 +25,7 @@ Core\Textures.lua
 Core\Format.lua
 Core\TextLayout.lua
 Core\Geometry.lua
+Core\PetHappiness.lua
 
 Assets\RoundedBorderAtlas.lua
 Frames\RoundedBorder.lua
@@ -36,6 +37,7 @@ Frames\Pet.lua
 Frames\ToT.lua
 Frames\PetTarget.lua
 Frames\PetTargetVisibility.lua
+Frames\PetHappinessPanel.lua
 
 UI\Widgets.lua
 UI\MediaPicker.lua
