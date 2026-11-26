@@ -2,7 +2,22 @@
 local ADDON_NAME, VFS = ...
 VFS.RoundedBorderAtlas = {
   texture = "Interface\\AddOns\\" .. ADDON_NAME .. "\\Assets\\rounded_border_atlas.tga",
-  thickness = 6, cornerSize = 9, minimumInnerSize = 6,
+  thickness = 4, cornerSize = 7, minimumInnerSize = 6, feathered = false,
+  slices = {
+    topLeft = { 0.015625, 0.234375, 0.015625, 0.234375 },
+    top = { 0.328125, 0.390625, 0.015625, 0.234375 },
+    topRight = { 0.640625, 0.859375, 0.015625, 0.234375 },
+    left = { 0.015625, 0.234375, 0.328125, 0.390625 },
+    center = { 0.328125, 0.390625, 0.328125, 0.390625 },
+    right = { 0.640625, 0.859375, 0.328125, 0.390625 },
+    bottomLeft = { 0.015625, 0.234375, 0.640625, 0.859375 },
+    bottom = { 0.328125, 0.390625, 0.640625, 0.859375 },
+    bottomRight = { 0.640625, 0.859375, 0.640625, 0.859375 },
+  },
+}
+VFS.RoundedGlowAtlas = {
+  texture = "Interface\\AddOns\\" .. ADDON_NAME .. "\\Assets\\rounded_glow_atlas.tga",
+  thickness = 6, cornerSize = 9, minimumInnerSize = 6, feathered = true,
   slices = {
     topLeft = { 0.015625, 0.296875, 0.015625, 0.296875 },
     top = { 0.328125, 0.390625, 0.015625, 0.296875 },

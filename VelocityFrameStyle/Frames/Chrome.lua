@@ -29,9 +29,9 @@ Chrome.LAYOUT = {
 }
 -- side = which side of the portrait the bars sit on: "right" (player/pet: portrait left) | "left" (target: portrait right)
 
--- Combat outline thickness = the black border's thickness, so FrameBase.CreateSurfaceBorder picks the rounded atlas
--- renderer and the red ring has exactly the border's corner radii. (Was 2 = the square flat fallback.)
-Chrome.COMBAT_OUTLINE_THICKNESS = VFS.FrameBase and VFS.FrameBase.BAR_BORDER_WIDTH or 6
+-- Combat glow thickness selects the FEATHERED glow atlas in FrameBase.CreateSurfaceBorder: same inner rounded rect as
+-- the 4-unit black border, alpha fading to zero at 6 units, ADD-blended so it brightens the border and bleeds past it.
+Chrome.COMBAT_OUTLINE_THICKNESS = VFS.FrameBase and VFS.FrameBase.COMBAT_GLOW_WIDTH or 6
 
 local function PlateColor()
   local g = DB.Global()
@@ -81,6 +81,7 @@ function Chrome.Create(st)
   for kind, bar in pairs(st.bars) do
     local stock = bar.stock
     local ring = VFS.FrameBase.CreateSurfaceBorder(glowFrame, stock, Chrome.COMBAT_OUTLINE_THICKNESS)
+    if ring.SetBorderBlendMode then ring:SetBorderBlendMode("ADD") end
     local function SyncLevel()
       ring:SetFrameStrata(stock:GetFrameStrata())
       ring:SetFrameLevel(stock:GetFrameLevel() + (stock.vfsBorderLevelOffset or 1) + 1)
@@ -150,7 +151,8 @@ function Chrome.ApplyColors(st)
   c.discSoft:SetVertexColor(r, g, b, a * 0.35)
   local gc = DB.Global().combatGlowColor or { 1, 0.1, 0.1 }
   c.glow.disc:SetVertexColor(gc[1], gc[2], gc[3], 0.7)
-  for _, ring in pairs(c.glow.rings) do ring:SetBorderColor(gc[1], gc[2], gc[3], 0.7) end
+  -- Full alpha: the atlas carries the falloff and the frame animation carries the throb.
+  for _, ring in pairs(c.glow.rings) do ring:SetBorderColor(gc[1], gc[2], gc[3], 1) end
 end
 
 -- Combat glow: shown while the unit is in combat (same signal Blizzard's flash uses) -----------------------

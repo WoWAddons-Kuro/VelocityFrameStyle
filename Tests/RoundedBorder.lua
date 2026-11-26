@@ -14,6 +14,7 @@ function methods:CreateTexture() return region(self) end
 function methods:SetTexture(v) self.texture=v end
 function methods:SetTexCoord(...) self.uv={...} end
 function methods:SetVertexColor(...) self.color={...} end
+function methods:SetBlendMode(v) self.blend=v end
 function methods:SetColorTexture(...) self.color={...} end
 function methods:SetHorizTile(v) self.hTile=v end
 function methods:SetVertTile(v) self.vTile=v end
@@ -37,24 +38,35 @@ for _,file in ipairs({'Assets/RoundedBorderAtlas.lua','Frames/RoundedBorder.lua'
   assert(loadfile('VelocityFrameStyle/'..file))('VelocityFrameStyle',ns)
 end
 local atlas=ns.RoundedBorderAtlas
-assert(atlas.thickness==6 and atlas.cornerSize==9 and atlas.minimumInnerSize==6)
+local glowAtlas=ns.RoundedGlowAtlas
+assert(atlas.thickness==4 and atlas.cornerSize==7 and atlas.minimumInnerSize==6 and atlas.feathered==false)
+assert(glowAtlas.thickness==6 and glowAtlas.cornerSize==9 and glowAtlas.minimumInnerSize==6 and glowAtlas.feathered==true)
+assert(ns.FrameBase.BAR_BORDER_WIDTH==atlas.thickness and ns.FrameBase.COMBAT_GLOW_WIDTH==glowAtlas.thickness)
+assert(atlas.texture~=glowAtlas.texture, 'border and glow are separate atlases')
 local bar=region(region()); bar.rect={0,0,113,-24}
 local backdrop=ns.FrameBase.AcquireBackdrop(bar)
+local glow=ns.FrameBase.CreateSurfaceBorder(bar.parent,bar,ns.FrameBase.COMBAT_GLOW_WIDTH)
+glow:SetBorderBlendMode('ADD')
+-- {border frame, atlas it must use}; the glow uses the feathered atlas with a wider ring/corner.
+local rings={{backdrop.border,atlas},{backdrop.ring,atlas},{glow,glowAtlas}}
 for _,size in ipairs({{113,24},{113,12},{70,10},{70,7},{40,6},{200,40}}) do
   bar.rect={0,0,size[1],-size[2]}
-  for _,border in ipairs({backdrop.border,backdrop.ring}) do
+  for _,entry in ipairs(rings) do
+    local border,a=entry[1],entry[2]
+    local t,c=a.thickness,a.cornerSize
     border.OnSizeChanged()
-    local w,h=border:GetSize(); assert(w==size[1]+12 and h==size[2]+12)
+    local w,h=border:GetSize(); assert(w==size[1]+2*t and h==size[2]+2*t)
     assert(border.edges.center==nil, 'no centre texture may cover the fill')
     local count=0
     for name,piece in pairs(border.edges) do
-      count=count+1; assert(piece.texture==atlas.texture and piece.color[4]==1)
-      for i=1,4 do assert(piece.uv[i]==atlas.slices[name][i]) end
+      count=count+1; assert(piece.texture==a.texture and piece.color[4]==1)
+      for i=1,4 do assert(piece.uv[i]==a.slices[name][i]) end
+      if border==glow then assert(piece.blend=='ADD', 'glow pieces must be additive') end
     end
     assert(count==8)
     for name,anchor in pairs({topLeft='TOPLEFT',topRight='TOPRIGHT',bottomLeft='BOTTOMLEFT',bottomRight='BOTTOMRIGHT'}) do
       local piece=border.edges[name]
-      assert(piece.width==9 and piece.height==9 and piece.points[anchor][1]==border)
+      assert(piece.width==c and piece.height==c and piece.points[anchor][1]==border)
       assert(piece.shown)
     end
     assert(border.edges.top.shown and border.edges.bottom.shown)
@@ -66,6 +78,6 @@ for _,size in ipairs({{113,24},{113,12},{70,10},{70,7},{40,6},{200,40}}) do
   end
 end
 assert(backdrop:GetFrameLevel()<bar:GetFrameLevel() and backdrop.ring:GetFrameLevel()>bar:GetFrameLevel())
-local glow=ns.FrameBase.CreateSurfaceBorder(bar.parent,bar,2)
-assert(glow.edges.topLeft==nil, '2-unit combat outline must stay flat')
-print('PASS: generated UVs, eight border-only pieces, both layers, fixed corners, resizing/minimum span and flat glow')
+local flat=ns.FrameBase.CreateSurfaceBorder(bar.parent,bar,2)
+assert(flat.edges.topLeft==nil, 'an unmatched thickness must fall back to the flat renderer')
+print('PASS: border + feathered glow atlases, eight border-only pieces, both layers, fixed corners, resizing/minimum span, flat fallback')

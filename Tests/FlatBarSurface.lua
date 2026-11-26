@@ -48,16 +48,19 @@ local bar = region(region())
 bar.rect = { 20, 100, 133, 76 }
 local backdrop = ns.FrameBase.AcquireBackdrop(bar)
 assert(ns.FrameBase.AcquireBackdrop(bar) == backdrop, 'must reuse existing stack')
+-- No rounded atlas is loaded here, so the flat renderer is exercised at the real border width.
+local T = ns.FrameBase.BAR_BORDER_WIDTH
+assert(T == 4, 'border width contract (owner 2026-11-25)')
 for _, size in ipairs({ {113,24}, {113,12}, {70,10}, {70,7}, {200,40} }) do
   bar.rect = {20, 100, 20 + size[1], 100 - size[2]}
   local l, t, r, b = unpack(bar.rect)
   equals(rect(backdrop.tex), bar.rect)
   for _, border in ipairs({ backdrop.border, backdrop.ring }) do
-    equals(rect(border), {l-6, t+6, r+6, b-6})
-    equals(rect(border.edges.top), {l-6, t+6, r+6, t})
-    equals(rect(border.edges.bottom), {l-6, b, r+6, b-6})
-    equals(rect(border.edges.left), {l-6, t, l, b})
-    equals(rect(border.edges.right), {r, t, r+6, b})
+    equals(rect(border), {l-T, t+T, r+T, b-T})
+    equals(rect(border.edges.top), {l-T, t+T, r+T, t})
+    equals(rect(border.edges.bottom), {l-T, b, r+T, b-T})
+    equals(rect(border.edges.left), {l-T, t, l, b})
+    equals(rect(border.edges.right), {r, t, r+T, b})
     for _, edge in pairs(border.edges) do equals(edge.color, {0,0,0,1}) end
   end
 end

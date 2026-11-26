@@ -19,10 +19,16 @@ VFS.Frames = {}     -- VFS_FrameID -> VFS_FrameState
 -- Border renderer contract: reference region = INNER surface; thickness grows OUTWARD.
 -- Both copies use these exact anchors. Replacing this renderer with a rounded atlas
 -- later must not change any bar sizing, placement, background or value handling.
-FrameBase.BAR_BORDER_WIDTH = 6
+-- 4 units (owner 2026-11-25; was 6) so the 6-unit feathered combat glow reads as a halo beyond it.
+FrameBase.BAR_BORDER_WIDTH = 4
+FrameBase.COMBAT_GLOW_WIDTH = 6
+-- thickness == BAR_BORDER_WIDTH -> hard rounded border atlas; == COMBAT_GLOW_WIDTH -> feathered glow atlas;
+-- anything else -> flat four-edge fallback (tests, odd sizes).
 function FrameBase.CreateSurfaceBorder(parent, surface, thickness)
-  if VFS.RoundedBorder and thickness == VFS.RoundedBorderAtlas.thickness then
-    return VFS.RoundedBorder.Create(parent, surface)
+  if VFS.RoundedBorder then
+    local hard, glow = VFS.RoundedBorderAtlas, VFS.RoundedGlowAtlas
+    if hard and thickness == hard.thickness then return VFS.RoundedBorder.Create(parent, surface, hard) end
+    if glow and thickness == glow.thickness then return VFS.RoundedBorder.Create(parent, surface, glow) end
   end
   local border = CreateFrame("Frame", nil, parent)
   border:EnableMouse(false)

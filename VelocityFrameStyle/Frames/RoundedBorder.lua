@@ -1,11 +1,13 @@
 -- Border-only explicit nine-slice renderer. Generated UVs keep fixed corner radii
 -- independent of bar width/height; there is deliberately no centre texture.
+-- Renders any generated ring atlas (VFS.RoundedBorderAtlas = hard 4-unit black border,
+-- VFS.RoundedGlowAtlas = feathered 6-unit combat glow); both grow OUTWARD from the surface.
 local ADDON_NAME, VFS = ...
 local RoundedBorder = {}
 VFS.RoundedBorder = RoundedBorder
 
-function RoundedBorder.Create(parent, surface)
-  local atlas = VFS.RoundedBorderAtlas
+function RoundedBorder.Create(parent, surface, atlas)
+  atlas = atlas or VFS.RoundedBorderAtlas
   local border = CreateFrame("Frame", nil, parent)
   border:EnableMouse(false)
   border:SetPoint("TOPLEFT", surface, "TOPLEFT", -atlas.thickness, atlas.thickness)
@@ -50,6 +52,10 @@ function RoundedBorder.Create(parent, surface)
   UpdateEdgeVisibility()
   function border:SetBorderColor(r, g, b, a)
     for _, piece in pairs(self.edges) do piece:SetVertexColor(r, g, b, a) end
+  end
+  -- ADD for the glow so it brightens the black border instead of painting over it.
+  function border:SetBorderBlendMode(mode)
+    for _, piece in pairs(self.edges) do piece:SetBlendMode(mode) end
   end
   return border
 end

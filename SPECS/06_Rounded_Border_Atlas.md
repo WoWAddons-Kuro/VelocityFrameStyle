@@ -21,9 +21,15 @@ Outputs:
 
 ## Geometry contract
 
-- Border thickness: 6 UI units.
-- Inner corner radius: 3 UI units; outer radius: 9 UI units.
-- Each fixed corner covers 9×9 UI units: 6 outside the inner surface plus 3 inside it.
+Two rings measured by `d` = distance outward from the bar edge (negative = inside the bar; inner corner radius 3 UI units), each its own 128×128 atlas:
+
+| Ring | File / Lua table | Span in `d` | Corner tile | Alpha |
+|---|---|---|---|---|
+| Black border | `rounded_border_atlas.tga` / `VFS.RoundedBorderAtlas` | **[0, 4]** (was 6 until 2026-11-25) | 7×7 | 1 across the annulus, AA on both curves |
+| Combat halo | `rounded_glow_atlas.tga` / `VFS.RoundedGlowAtlas` | **[−2, 6]** (8 wide) | 9×9 | `(1 − |d − 2| / 4)²`: peak 1 at the border midline `d = 2`, 0 at both ends |
+
+- The halo is tinted `combatGlowColor`, ADD-blended, one copy per bar on Chrome's throbbing frame. Owner decision 2026-11-25: a "halo glow" of the border itself — strongest at its centre, feathering symmetrically 2 units into the bar and 2 units past the border. Lua `thickness` for a ring = its outer extent in `d` (the frame offset).
+- Each fixed corner covers outer extent + 3 UI units: the ring outside the inner surface plus 3 inside it (the halo's inner feather ends at the same offset).
 - Source resolution: 4 pixels per UI unit, with 8×8 supersampling per source pixel.
 - Explicit 3×3 slice grid in 40-pixel cells; each tile has two extruded gutter pixels. Use UVs from metadata, not the whole image.
 - Centre is completely transparent. Straight edges are opaque black after runtime tinting; inner/outer curved boundaries have coverage antialiasing.
@@ -33,14 +39,14 @@ Outputs:
 
 ## Runtime integration
 
-Keep the existing inner StatusBar geometry authoritative. Outer rect = inner rect expanded by 6 units. Draw the same border geometry below and above the bar; the upper inner-corner cut-outs cover square fill corners. Do not change value handling or prediction FillMasks.
+Keep the existing inner StatusBar geometry authoritative. Outer rect = inner rect expanded by the ring's thickness. Draw the same border geometry below and above the bar; the upper inner-corner cut-outs cover square fill corners. Do not change value handling or prediction FillMasks.
 
-`Frames/RoundedBorder.lua` renders eight pieces (no centre). `FrameBase.CreateSurfaceBorder` dispatches to it only for the atlas's 6-unit thickness; the 2-unit combat outline retains the flat renderer. Both the lower and upper bar borders use the same atlas/anchors. All three TOCs load the generated metadata and renderer before FrameBase.
+`Frames/RoundedBorder.lua` renders eight pieces (no centre) for whichever atlas it is given. `FrameBase.CreateSurfaceBorder` dispatches by thickness: `BAR_BORDER_WIDTH` (4) → border atlas, `COMBAT_GLOW_WIDTH` (6) → glow atlas, anything else → flat four-edge fallback. Both the lower and upper bar borders use the border atlas; Chrome's per-bar glow rings use the glow atlas with `SetBorderBlendMode("ADD")`. All three TOCs load the generated metadata and renderer before FrameBase.
 
-The renderer hides zero-span edges at the minimum supported dimensions. A size-change handler updates visibility; corners never stretch. `Tests/RoundedBorder.lua` checks both border layers, fixed corners, generated UVs, resize/minimum handling and the flat combat-outline fallback.
+The renderer hides zero-span edges at the minimum supported dimensions. A size-change handler updates visibility; corners never stretch. `Tests/RoundedBorder.lua` checks both border layers and the glow ring against their atlases, fixed corners, generated UVs, resize/minimum handling and the flat fallback.
 
 ## Validation
 
-The generator asserts: transparent centre, opaque straight edge, intermediate AA pixels, horizontal/vertical symmetry, and exact pixel-for-pixel agreement between atlas reconstruction and direct rounded-annulus rasterization at inner sizes 113×24, 113×12, 70×10, 70×7, 200×40 and 40×6.
+The generator asserts per ring: transparent centre, opaque straight edge (border) or monotone falloff bright-at-bar / near-zero-at-edge (glow), intermediate AA pixels, horizontal/vertical symmetry, and exact pixel-for-pixel agreement between atlas reconstruction and direct rasterization at inner sizes 113×24, 113×12, 70×10, 70×7, 200×40 and 40×6.
 
-Preview rows are player/target health, player/target power, pet health and pet power at 4×. The checkerboard demonstrates transparent exterior and the 30%-alpha empty interior. It includes both border copies and a 72%-full square fill. Owner approved the initial in-game appearance; exhaustive size/client combinations remain future regression checks.
+Preview rows are player/target health, player/target power, pet health and pet power at 4×; the first two rows add the glow at peak throb. The checkerboard demonstrates transparent exterior and the 30%-alpha empty interior. It includes both border copies and a 72%-full square fill. Owner approved the 6-unit border in game 2026-11-25; the 4-unit border + glow awaits the next in-game check.
