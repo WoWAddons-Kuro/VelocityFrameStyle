@@ -20,6 +20,34 @@ local function PlaceSkull(st)
   if skull and level then skull:ClearAllPoints(); skull:SetPoint("CENTER", level, "CENTER", 0, 0) end
 end
 
+-- Era TargetFrame auras: Blizzard pins the FIRST buff/debuff row at TOPLEFT -> TargetFrame BOTTOMLEFT (21, 28), a
+-- fixed height sized for its stock bars; our taller stack ends lower, so row 1 ran into the power bar. After every
+-- UpdateAuras re-anchor only the auras that are anchored to the TargetFrame itself (row starts) to hang below our
+-- lowest bar's border instead. Later rows chain off row 1 and follow. Aura buttons are unprotected: legal in combat.
+-- Forever's TargetFrame lays auras out differently (no buttons anchored to the frame bottom) so this finds nothing there.
+local AURA_GAP_BELOW_BORDER = 2
+local function ReanchorAuraRowStarts(st)
+  local lowest = st.slots and st.slots.below
+  if not lowest or not TargetFrame then return end
+  local y = -(FrameBase.BAR_BORDER_WIDTH + AURA_GAP_BELOW_BORDER)
+  for _, prefix in ipairs({ "TargetFrameBuff", "TargetFrameDebuff" }) do
+    local i = 1
+    while true do
+      local aura = _G[prefix .. i]
+      if not aura then break end
+      if aura:IsShown() and aura:GetNumPoints() > 0 then
+        local point, relTo, relPoint, x = aura:GetPoint(1)
+        if relTo == TargetFrame and point == "TOPLEFT" and relPoint == "BOTTOMLEFT" then
+          aura:ClearAllPoints()
+          aura:SetPoint("TOPLEFT", lowest, "BOTTOMLEFT", 0, y)
+        end
+      end
+      i = i + 1
+    end
+  end
+end
+Target.ReanchorAuraRowStarts = ReanchorAuraRowStarts
+
 function Target.Create()
   local st = FrameBase.Acquire("target")
   if not st then return end
@@ -30,8 +58,11 @@ function Target.Create()
   if TargetFrame.CheckClassification then hooksecurefunc(TargetFrame, "CheckClassification", function() PlaceBars(st); FrameBase.Restyle("target"); PlaceSkull(st) end) end
   if TargetFrame.UpdateHealthBarVisuals then hooksecurefunc(TargetFrame, "UpdateHealthBarVisuals", function() PlaceBars(st) end) end
   if TargetFrame_CheckClassification then hooksecurefunc("TargetFrame_CheckClassification", function() PlaceBars(st); FrameBase.Restyle("target"); PlaceSkull(st) end) end
+  if TargetFrame.UpdateAuras then hooksecurefunc(TargetFrame, "UpdateAuras", function() ReanchorAuraRowStarts(st) end) end
+  if TargetFrame_UpdateAuras then hooksecurefunc("TargetFrame_UpdateAuras", function(frame) if frame == TargetFrame then ReanchorAuraRowStarts(st) end end) end
   FrameBase.Restyle("target")
   PlaceSkull(st)
+  ReanchorAuraRowStarts(st)
   return st
 end
 
