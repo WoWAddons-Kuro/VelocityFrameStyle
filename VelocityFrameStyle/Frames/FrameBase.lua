@@ -182,6 +182,8 @@ function FrameBase.Acquire(id)
   st.host = TextLayout.CreateHost(button, 1)
   st.host.top:SetFrameStrata(button:GetFrameStrata())
   st.host.top:SetFrameLevel(top + 3)
+  -- Portrait badge slot (the 'portrait' Position); shown by TextLayout only while an element uses it.
+  FrameBase.PortraitBadge(st)
   -- Own value strings on both clients. The client formatter handles secret values
   -- through Blizzard's APIs, independently of the global status-text setting.
   VFS.Frames[id] = st
@@ -202,6 +204,83 @@ function FrameBase.NameRowAbove(st, bar, rowHeight, gap)
   row:SetPoint("BOTTOMRIGHT", bar, "TOPRIGHT", 0, clearance)
   st.nameRow = row
   return row
+end
+
+-- The 'portrait' slot: a small badge (near-black disc + black ring, the bar-border look) riding the portrait disc's
+-- lower rim, where the old VelocityPetTargetFrame drew its level (owner, Era 2026-11-25). It sits on the BAR side of
+-- the portrait - south-east for Player/Pet/ToT (bars right), south-west for Target/Pet Target (bars left) - so it
+-- tucks into the portrait/power-bar transition (owner). Any text element may pick it as its Position (Level does by
+-- default); TextLayout centres the element on it and shows the badge only while something is anchored there.
+-- Anchored to the portrait, never to the bars, so bar dimensions do not move it.
+-- Sized from the portrait diameter so Pet/ToT badges are proportionally smaller than Player/Target.
+-- LAYERING: the badge frame must sit BELOW host.top (which owns the FontStrings), never be its child - as a child at a
+-- higher level its textures covered the level number (owner, Era 2026-11-25).
+FrameBase.PORTRAIT_BADGE_SCALE = 0.36   -- disc diameter as a fraction of the portrait diameter (64 -> 23, 37 -> 13)
+FrameBase.PORTRAIT_BADGE_RING  = 0.10   -- ring width as a fraction of the badge diameter (~ the 4px border at 64)
+FrameBase.PORTRAIT_BADGE_OFFSET = 0.0   -- badge centre offset from the rim's 225-degree point, in badge radii (+ = further out)
+local BADGE_DISC = "Interface\\CHARACTERFRAME\\TempPortraitAlphaMask"   -- feathered white disc, tinted
+local function BadgeMetrics(portrait)
+  local pd = portrait:GetWidth() or 60
+  local size = math.floor(pd * FrameBase.PORTRAIT_BADGE_SCALE + 0.5)
+  local ring = math.max(2, math.floor(size * FrameBase.PORTRAIT_BADGE_RING + 0.5))
+  -- Rim point at 225 degrees is (1 - cos45) r = 0.293 r in from the portrait's bottom-left corner. Push the badge
+  -- centre outward along that diagonal by OFFSET badge radii (owner: "30% more south-west" than on the rim point).
+  local r = pd / 2
+  local along = 0.293 * r - FrameBase.PORTRAIT_BADGE_OFFSET * (size / 2) * 0.7071
+  return size, ring, along
+end
+function FrameBase.PortraitBadge(st)
+  if st.portraitBadge then return st.portraitBadge end
+  local portrait = Client.Portrait(st.id)
+  if not portrait then return nil end
+  local badge = CreateFrame("Frame", nil, st.button)
+  badge:EnableMouse(false)
+  badge.ring = badge:CreateTexture(nil, "BACKGROUND", nil, -2)
+  badge.ring:SetTexture(BADGE_DISC)
+  badge.ring:SetPoint("CENTER")
+  badge.disc = badge:CreateTexture(nil, "BACKGROUND", nil, -1)
+  badge.disc:SetTexture(BADGE_DISC)
+  badge.disc:SetAllPoints(badge)
+  function badge:ApplyColors()
+    local g = DB.Global()
+    local c = g.plateColor or { 0.02, 0.02, 0.02 }
+    self.disc:SetVertexColor(c[1], c[2], c[3], g.plateAlpha or 0.9)   -- same plate as the portrait disc
+    self.ring:SetVertexColor(0, 0, 0, 1)                               -- opaque black, like the bar borders
+  end
+  -- Level: above the portrait's CURRENT parent (Chrome reparents portraits into a raised portraitLayer whose level
+  -- varies per frame - on Target it beat host.top-1 and drew over the badge, owner 2026-11-25) and below host.top,
+  -- which owns the text. Re-synced when either moves.
+  local function SyncLevel()
+    local portraitParent = portrait:GetParent()
+    local floor = (portraitParent and portraitParent.GetFrameLevel) and (portraitParent:GetFrameLevel() + 1) or 0
+    badge:SetFrameStrata(st.host.top:GetFrameStrata())
+    badge:SetFrameLevel(math.max(floor, st.host.top:GetFrameLevel() - 1))
+    if st.host.top:GetFrameLevel() <= badge:GetFrameLevel() then st.host.top:SetFrameLevel(badge:GetFrameLevel() + 1) end
+  end
+  SyncLevel()
+  hooksecurefunc(st.host.top, "SetFrameLevel", SyncLevel)
+  hooksecurefunc(st.host.top, "SetFrameStrata", SyncLevel)
+  badge.SyncLevel = SyncLevel
+  badge:ApplyColors()
+  badge:Hide()
+  st.portraitBadge = badge
+  FrameBase.PlacePortraitBadge(st)
+  return badge
+end
+
+-- Size + place from the CURRENT portrait size (Edit Mode zoom on Blizzard frames; Pet is 37, Player/Target 64).
+-- Corner follows Chrome.LAYOUT[id].side: bars on the right -> badge at the portrait's bottom-RIGHT, else bottom-left.
+function FrameBase.PlacePortraitBadge(st)
+  local badge, portrait = st.portraitBadge, Client.Portrait(st.id)
+  if not badge or not portrait then return end
+  local size, ring, along = BadgeMetrics(portrait)
+  badge:SetSize(size, size)
+  badge.ring:SetSize(size + 2 * ring, size + 2 * ring)
+  local layout = VFS.Chrome and VFS.Chrome.LAYOUT[st.id]
+  local barsRight = layout and layout.side == "right"
+  badge:ClearAllPoints()
+  if barsRight then badge:SetPoint("CENTER", portrait, "BOTTOMRIGHT", -along, along)
+  else badge:SetPoint("CENTER", portrait, "BOTTOMLEFT", along, along) end
 end
 
 -- Portrait style: default / class_old / class_new (players only) ------------------------------------------
@@ -409,6 +488,7 @@ function FrameBase.ApplyAppearance(st)
   if not enabled then for _, t in pairs(st.host.text) do if not t.vfsAdopted then t:Hide() end end end
   FrameBase.RefreshPowerVisibility(st)
   FrameBase.ApplyPredictions(st)
+  if st.portraitBadge then st.portraitBadge:ApplyColors(); FrameBase.PlacePortraitBadge(st); st.portraitBadge.SyncLevel() end
   if VFS.Chrome then VFS.Chrome.SetShown(st, enabled); VFS.Chrome.Layout(st); VFS.Chrome.ApplyColors(st); VFS.Chrome.UpdateCombat(st) end
 end
 

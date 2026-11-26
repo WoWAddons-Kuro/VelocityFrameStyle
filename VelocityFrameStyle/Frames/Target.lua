@@ -53,7 +53,7 @@ function Target.Create()
   if not st then return end
   PlaceBars(st)
   local hb, pb = FrameBase.Bar(st, "health"), FrameBase.Bar(st, "power")
-  st.slots = { health = hb, power = pb, nameplate = hb and FrameBase.NameRowAbove(st, hb), above = hb, below = pb or hb }
+  st.slots = { health = hb, power = pb, nameplate = hb and FrameBase.NameRowAbove(st, hb), above = hb, below = pb or hb, portrait = st.portraitBadge }
   FrameBase.HookCommon(st)
   if TargetFrame.CheckClassification then hooksecurefunc(TargetFrame, "CheckClassification", function() PlaceBars(st); FrameBase.Restyle("target"); PlaceSkull(st) end) end
   if TargetFrame.UpdateHealthBarVisuals then hooksecurefunc(TargetFrame, "UpdateHealthBarVisuals", function() PlaceBars(st) end) end

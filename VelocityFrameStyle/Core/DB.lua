@@ -10,7 +10,7 @@ VFS.DB = DB
 
 local DB_VERSION = 2
 
--- VFS_TextAnchor = "health" | "power" | "nameplate" | "above" | "below" | "hidden"
+-- VFS_TextAnchor = "health" | "power" | "nameplate" | "above" | "below" | "portrait" (badge on the portrait rim) | "hidden"
 -- VFS_TextAlign  = "left" | "center" | "right"
 -- VFS_ColorMode  = "stock" | "white" | "difficulty" | "class" | "reaction" | "custom"
 -- VFS_TextElement = { id, label, format, anchor, align, size, color, customColor = {r,g,b} }
@@ -23,7 +23,7 @@ end
 local function DefaultElements()
   return {
     E("name",      "Name",     "[name]",   "nameplate", "left",   10, "stock"),
-    E("level",     "Level",    "[level]",  "nameplate", "right",  10, "difficulty"),
+    E("level",     "Level",    "[level]",  "portrait",  "center", 10, "difficulty"),   -- badge on the portrait rim (owner 2026-11-25)
     E("health",    "Health",   "[hp]",     "health",    "center", 10, "white"),
     E("power",     "Power",    "[power]",  "power",     "center", 10, "white"),
   }
@@ -98,6 +98,16 @@ function DB.Init()
       if frame.override then frame.override.backingAlpha = nil end
     end
     db.flatBarSurfaces = true
+  end
+  -- Portrait badge became the Level default (owner 2026-11-25). Move existing saves off the old name-row default once;
+  -- a Level the user had deliberately put elsewhere (health / power / above / below / hidden) is left alone.
+  if not db.levelOnPortraitBadge then
+    for _, frame in pairs(db.frames) do
+      for _, e in ipairs(frame.elements or {}) do
+        if e.id == "level" and e.anchor == "nameplate" then e.anchor = "portrait"; e.align = "center" end
+      end
+    end
+    db.levelOnPortraitBadge = true
   end
   -- Removing pet-target zoom: preserve UIParent-relative anchor offsets at scale 1.
   local oldScale = db.global.petTargetScale

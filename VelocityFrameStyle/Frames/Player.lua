@@ -19,7 +19,7 @@ function Player.Create()
   if not st then return end
   PlaceBars(st)
   local hb, pb = FrameBase.Bar(st, "health"), FrameBase.Bar(st, "power")
-  st.slots = { health = hb, power = pb, nameplate = hb and FrameBase.NameRowAbove(st, hb), above = hb, below = pb or hb }
+  st.slots = { health = hb, power = pb, nameplate = hb and FrameBase.NameRowAbove(st, hb), above = hb, below = pb or hb, portrait = st.portraitBadge }
   FrameBase.HookCommon(st)
   -- Blizzard re-applies art and bar geometry here; re-assert ours after it
   for _, fn in ipairs({ "PlayerFrame_ToPlayerArt", "PlayerFrame_UpdateArt", "PlayerFrame_UpdateHealthBarVisuals", "PlayerFrame_UpdateManaBarVisuals" }) do

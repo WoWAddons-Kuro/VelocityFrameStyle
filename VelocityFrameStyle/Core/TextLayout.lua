@@ -2,8 +2,9 @@
 -- Lifted from VelocityPlateStyle\Skin.lua (LayoutRow / ApplyTexts) and generalised: PlateStyle has ONE bar, a unit
 -- frame has several slot rectangles. The caller hands us a VFS_TextSlots table and we lay the elements out.
 --
---   VFS_TextSlots = { health = Region, power = Region, nameplate = Region, above = Region, below = Region }
+--   VFS_TextSlots = { health = Region, power = Region, nameplate = Region, above = Region, below = Region, portrait = Frame }
 --     health/power/nameplate are rows laid INSIDE the region; above/below are rows hanging off the top/bottom of it.
+--     portrait is the small badge on the portrait rim; elements there are centred on it.
 --   VFS_TextHost  = { top = Frame (one level above the bars, owns the FontStrings), text = { [id] = FontString } }
 --
 -- Within a row, elements are grouped by align (left/center/right) and flow from that edge in list order with GAP px
@@ -230,8 +231,10 @@ local function LayoutRow(items, rel, mode)
 end
 
 -- Lay out every visible element into its slot. slots = VFS_TextSlots; a slot whose region is nil hides its elements.
+-- 'portrait' is the badge on the portrait rim (FrameBase.PortraitBadge): elements are centred on it, align ignored,
+-- and the badge itself is shown only while at least one visible element sits there.
 function TextLayout.Layout(host, elements, slots)
-  local rows = { health = {}, power = {}, nameplate = {}, above = {}, below = {} }
+  local rows = { health = {}, power = {}, nameplate = {}, above = {}, below = {}, portrait = {} }
   for _, e in ipairs(elements) do
     local fs = host.text[e.id]
     if fs and fs.vfsVisible then
@@ -245,6 +248,14 @@ function TextLayout.Layout(host, elements, slots)
   if slots.nameplate then LayoutRow(rows.nameplate, slots.nameplate, "inside") end
   if slots.above then LayoutRow(rows.above, slots.above, "above") end
   if slots.below then LayoutRow(rows.below, slots.below, "below") end
+  local badge = slots.portrait
+  if badge then
+    for _, item in ipairs(rows.portrait) do
+      item.fs:ClearAllPoints(); item.fs:SetJustifyH("CENTER"); item.fs:SetWidth(0)
+      SetP(item.fs, "CENTER", badge, "CENTER", 0, 0)
+    end
+    if badge.SetShown then badge:SetShown(#rows.portrait > 0) end
+  end
 end
 
 -- Hide strings for elements that no longer exist in the list

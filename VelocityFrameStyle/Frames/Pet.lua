@@ -35,7 +35,7 @@ function Pet.Create()
   if not st then return end
   PlaceBars(st)
   local hb, pb = FrameBase.Bar(st, "health"), FrameBase.Bar(st, "power")
-  st.slots = { health = hb, power = pb, nameplate = hb and FrameBase.NameRowAbove(st, hb, 11, 1), above = hb, below = pb or hb }
+  st.slots = { health = hb, power = pb, nameplate = hb and FrameBase.NameRowAbove(st, hb, 11, 1), above = hb, below = pb or hb, portrait = st.portraitBadge }
   FrameBase.HookCommon(st)
   if PetFrame.Update then hooksecurefunc(PetFrame, "Update", function() PlaceBars(st); FrameBase.Restyle("pet"); PlaceHappiness(st) end) end
   if PetFrame_Update then hooksecurefunc("PetFrame_Update", function() PlaceBars(st); FrameBase.Restyle("pet"); PlaceHappiness(st) end) end

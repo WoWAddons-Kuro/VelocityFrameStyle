@@ -10,7 +10,7 @@ VFS.FramePage = FramePage
 local LABELS = { player = "Player", target = "Target", pet = "Pet", pettarget = "Pet Target", tot = "Target of Target" }
 FramePage.LABELS = LABELS
 
-local ANCHORS = { { "nameplate", "Name row" }, { "health", "Health bar" }, { "power", "Power bar" }, { "above", "Above" }, { "below", "Below" }, { "hidden", "Hidden" } }
+local ANCHORS = { { "nameplate", "Name row" }, { "health", "Health bar" }, { "power", "Power bar" }, { "above", "Above" }, { "below", "Below" }, { "portrait", "Portrait badge" }, { "hidden", "Hidden" } }
 local ALIGNS  = { { "left", "Left" }, { "center", "Center" }, { "right", "Right" } }
 local COLORS  = { { "stock", "Stock" }, { "white", "White" }, { "difficulty", "Difficulty" }, { "class", "Class" }, { "reaction", "Reaction" }, { "custom", "Custom" } }
 local SIZES = {}

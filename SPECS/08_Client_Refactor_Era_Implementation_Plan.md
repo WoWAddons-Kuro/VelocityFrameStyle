@@ -76,12 +76,12 @@ publish → play-test → commit round. Items marked *(spec first)* need a short
       one rounded-atlas ring per bar (`glow.rings[kind]`, same inner rect, one level above that bar's black ring), tinted `combatGlowColor`,
       all on the throbbing `glowFrame`. `FrameBase.RefreshPowerVisibility` zeroes `glow.rings.power` with the power bar on Target / Pet Target.
       Open: if 0.7-alpha red hides the black outline at peak throb, lower it; a feathered soft-glow atlas variant remains a later option.
-- [ ] **"Portrait adornment" position for text elements.** Keep the existing per-element *Position* setting (nameplate / health / power /
-      above / below / hidden) and add one more anchor value, **portrait adornment**: a small gold-ringed circle (our own disc + ring art, not
-      Blizzard's alpha-zeroed `LevelBackgroundCircle`) overlapping the portrait disc's **lower-left** edge, as the old VelocityPetTargetFrame
-      drew its level (owner reference, Era 2026-11-25). Anchored to the portrait, so bar dimensions never move it. Intended for the Level
-      element (default it there on Player and Pet; Pet level is our text from `UnitLevel`, Blizzard has no pet level region) but any single
-      element may select it. When the Level sits there the badge becomes the Target skull/classification anchor instead of the row text.
+- [x] **"Portrait badge" position for text elements** *(implemented 2026-11-25, awaiting owner confirmation of the SE/SW placement)*.
+      New *Position* value `portrait` ("Portrait badge"): near-black disc + black ring (bar-border look; `TempPortraitAlphaMask` tinted, no
+      new asset) sized at 0.36 × portrait diameter, on the portrait's lower rim on the **bar side** — bottom-right for Player/Pet/ToT, bottom-left
+      for Target/Pet Target, via `Chrome.LAYOUT[id].side`. **Level defaults there** on every frame; one-shot migration `db.levelOnPortraitBadge`
+      moves saves still on the name row. Badge frame sits one level BELOW `host.top` (as its child it covered the text). Shown only while an
+      element uses it. Knobs: `FrameBase.PORTRAIT_BADGE_SCALE / _RING / _OFFSET`. Target skull still follows the Level text, so it lands on the badge.
 - [ ] **Elite / rare / boss / skull (`??`) verification.** Test the Target level row against each classification: normal, elite, rareelite, rare, worldboss,
       and over-level `-1` → skull / `??`. Confirm the kept `HighLevelTexture` / `BossIcon` and our level text agree on every client; record findings in 03_Text_Template.md.
 - [ ] **Danger cues from VelocityPlateStyle** *(spec first)*. Port the VPS M2c/M2d behaviours to the Target (and Pet Target) frame: over-level threshold turns

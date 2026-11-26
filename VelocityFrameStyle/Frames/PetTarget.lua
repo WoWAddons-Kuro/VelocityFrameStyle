@@ -138,7 +138,8 @@ function PetTarget.Create()
   f.power:ClearAllPoints();  f.power:SetPoint("TOPRIGHT", f.health, "BOTTOMRIGHT", 0, -FrameBase.BAR_BORDER_WIDTH); f.power:SetSize(L.power.w, L.power.h)
   st.host = TextLayout.CreateHost(f, 7)
   f.art:SetFrameLevel(f:GetFrameLevel() + 6)
-  st.slots = { health = f.health, power = f.power, nameplate = FrameBase.NameRowAbove(st, f.health), above = f.health, below = f.power }
+  FrameBase.PortraitBadge(st)
+  st.slots = { health = f.health, power = f.power, nameplate = FrameBase.NameRowAbove(st, f.health), above = f.health, below = f.power, portrait = st.portraitBadge }
   VFS.Frames.pettarget = st
   PetTarget.state = st
   VFS.Chrome.Create(st)
