@@ -31,7 +31,7 @@ Detail lives in the numbered specs (07 review, 08 Era plan, 06 atlas). Started 2
 - [ ] Combat glow runtime non-uniformity: second copy with offset throb and/or `TextureCoordTranslation` wave
 - [ ] Badge tuning after more play: `PORTRAIT_BADGE_SCALE/_RING/_OFFSET`; pet badge vs size-10 font at 13px
 - [ ] **Pet level colour (owner 2026-11-25):** on the Pet frame the level is yellow when equal to the player's level or player − 1, and **red** below that — never grey. Today the `difficulty` colour mode uses `GetCreatureDifficultyColor` (green/grey for lower), which is the wrong semantics for a pet that is falling behind. Add a `petlevel` colour mode (or special-case `difficulty` when `unit == "pet"`) in `TextLayout.ColorFor`, default it for the Pet frame's Level element.
-- [ ] **Pet happiness hover panel** — spec written: [10_Pet_Happiness_Panel.md](10_Pet_Happiness_Panel.md). HPH method lifted: exact value via `UnitPower("pet", Happiness)` + measured drain + learned mood floors, learned-duration fallback. Out of combat only; triggers = happiness icon or pet level badge; stock pet XP bar hidden, XP shown in panel. Next: P0 verify exact value is plain on Era.
+- [x] **Pet happiness hover panel** (`c12fed7`) — [10_Pet_Happiness_Panel.md](10_Pet_Happiness_Panel.md). Exact value via `UnitPower("pet", 27)` + measured drain + learned mood floors; XP via `Client.PetExperience()`; training points; Shift-only option. **Owner retired HunterPetHappiness and BTT's pet XP bar 2026-11-25.** Open: P3b (BTT API for teachable-now colour).
 
 ## Loose ends noticed along the way
 
