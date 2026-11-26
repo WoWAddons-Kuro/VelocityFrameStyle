@@ -6,6 +6,7 @@ Detail lives in the numbered specs (07 review, 08 Era plan, 06 atlas). Started 2
 ## Classic Era refactor (spec 08, phases E0–E5)
 
 - [ ] E0 — contract + baseline: run tests, syntax-check, record Era build; remove dead client surface (`StockValueText`, `AdoptStock`/`vfsAdopted`, unused capability flags); required-vs-optional client methods, no silent Forever fallback
+- [ ] **NEXT SESSION: owned Target-of-Target frame** — handoff spec [11_Owned_ToT_Frame.md](11_Owned_ToT_Frame.md). Extract `OwnedUnitFrame` from PetTarget (T1, zero behaviour change), then ToT via the factory (T2–T3), Era test first, then Forever. Blizzard's ToT is not an Edit Mode system and is hidden when the target targets you — "sometimes" is correct behaviour, not a bug.
 - [ ] E1 — native hooks + legal anchors behind adapters; Geometry validate-before-clear, reentrancy guard, combat queue; connect or remove `ToT.OnEvent`
 - [ ] E2 — `Client.ResolveFrameBinding`; complete Era mappings for Player/Target/Pet/ToT/Pet Target (ToT missing on Era today); real-shaped fixtures
 - [ ] E3 — `GetPowerRowState` (visible/hidden/unknown) replaces `HasPowerResource`; verify Era APIs; Edit Mode layout matrix
@@ -30,7 +31,7 @@ Detail lives in the numbered specs (07 review, 08 Era plan, 06 atlas). Started 2
 - [ ] Alternate rectangular layout preset (radius-0 border + square portrait) *(spec first)*
 - [ ] Combat glow runtime non-uniformity: second copy with offset throb and/or `TextureCoordTranslation` wave
 - [ ] Badge tuning after more play: `PORTRAIT_BADGE_SCALE/_RING/_OFFSET`; pet badge vs size-10 font at 13px
-- [ ] **Pet level colour (owner 2026-11-25):** on the Pet frame the level is yellow when equal to the player's level or player − 1, and **red** below that — never grey. Today the `difficulty` colour mode uses `GetCreatureDifficultyColor` (green/grey for lower), which is the wrong semantics for a pet that is falling behind. Add a `petlevel` colour mode (or special-case `difficulty` when `unit == "pet"`) in `TextLayout.ColorFor`, default it for the Pet frame's Level element.
+- [x] **Pet level colour** (`71eb89a`): `difficulty` mode special-cases `UnitIsUnit(unit,"pet")` → yellow at player level or −1, red further behind, never green/grey.
 - [x] **Pet happiness hover panel** (`c12fed7`) — [10_Pet_Happiness_Panel.md](10_Pet_Happiness_Panel.md). Exact value via `UnitPower("pet", 27)` + measured drain + learned mood floors; XP via `Client.PetExperience()`; training points; Shift-only option. **Owner retired HunterPetHappiness and BTT's pet XP bar 2026-11-25.** Open: P3b (BTT API for teachable-now colour).
 
 ## Loose ends noticed along the way
