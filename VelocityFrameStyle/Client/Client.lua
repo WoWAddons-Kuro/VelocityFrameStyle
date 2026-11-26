@@ -31,6 +31,8 @@ Client.INTERFACE = {
   "ClassificationIcon",   -- (frameID) -> Texture|nil     skull (HighLevelTexture) - re-anchored onto our level badge
   "PetHappinessFrame",    -- () -> Frame|nil   Era hunter-pet happiness (PetFrameHappiness): functional, kept, and re-anchored
                           --                   beside our pet bars by Frames\Pet.lua. nil on clients without pet happiness.
+  "PetExperience",        -- () -> cur, max | nil   hunter-pet XP toward the next pet level. Era: GetPetExperience() (the pair
+                          --                   Blizzard's PetPaperDollFrame reads). nil when there is no hunter pet or no pet XP on this client.
   "Portrait",             -- (frameID) -> Texture|nil
   "NameText",             -- (frameID) -> FontString|nil  stock name (alpha-zeroed when our name element is active)
   "HealthTexts",          -- (frameID) -> { FontString, ... }  stock health strings (alpha-zeroed)

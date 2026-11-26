@@ -214,6 +214,14 @@ function PetHappiness.FormatTime(sec)
   return string.format("%d:%02d", math.floor(sec / 60), sec % 60)
 end
 
+-- Compact in-bar form: "5m 12s", "1h 02m", "42s" (owner: the segment reads "~5m 12s").
+function PetHappiness.FormatShort(sec)
+  sec = math.max(0, math.floor(sec + 0.5))
+  if sec >= 3600 then return string.format("%dh %02dm", math.floor(sec / 3600), math.floor(sec / 60) % 60) end
+  if sec >= 60 then return string.format("%dm %02ds", math.floor(sec / 60), sec % 60) end
+  return string.format("%ds", sec)
+end
+
 -- -> VFS_PetHappinessSummary (display-ready). Every estimate carries a leading "~".
 function PetHappiness.Describe(state, now)
   local mood = PetHappiness.MOOD[state.mood or 0]

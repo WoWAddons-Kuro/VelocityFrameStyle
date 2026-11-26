@@ -117,6 +117,7 @@ VFS.ClientFlavours.forever = {
     if id == "pettarget" then local f = Root(id); return f and f.skull end
   end,
   PetHappinessFrame = function() return nil end,   -- Mainline-based pet frame: no happiness
+  PetExperience = function() return nil end,       -- no pet levelling on this client
   Portrait = function(id)
     if id == "player" then return P(PlayerFrame, "PlayerFrameContainer.PlayerPortrait")
     elseif id == "target" then return P(TargetFrame, "TargetFrameContainer.Portrait")

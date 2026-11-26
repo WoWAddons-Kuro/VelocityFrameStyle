@@ -86,15 +86,18 @@ Layout per the owner mock, rounded-border look from the atlas, plate colour back
       (HPH only uses its sign). Max is **1000** on Era (HPH's window said 0-1000 on Forever too); mood floors therefore default to
       667 / 333 and are still learned from transitions. Implementation: resolve the index via the enum first, never a bare `4`;
       treat `max <= 5` as "not a happiness value" and fall through to the learned tier.
-- [ ] P1 — `Core\PetHappiness.lua` model + `Tests\PetHappiness.lua` (decay EMA, floor learning, sample rejection, ETA math, settle/zone guards) with a fake clock.
-- [ ] P2 — `Frames\PetHappinessPanel.lua`: frame, hooks on `PetFrameHappiness` + badge, combat gating, 1 s ticker while shown.
-- [ ] P3 — XP row in the panel from `GetPetExperience`. **Correction 2026-11-25:** Era `PetFrame.xml` has NO pet XP bar region; the green bar
-      under the pet frame in the owner's screenshot is **BeastTrainingTracker.Kuro's** `PetXP.lua` (`BeastTrainingTrackerKuroPetXP`, parented to
-      UIParent). Nothing to alpha-zero in Blizzard chrome. Hiding it = the owner turns BTT's pet XP bar off in its options (or BTT gains a
-      "hide when VFS panel present" check later). VFS must not reach into another addon's frames.
+- [x] P1 — `Core\PetHappiness.lua` model + `Tests\PetHappiness.lua` (decay EMA, floor learning, sample rejection, ETA math, settle/zone guards) with a fake clock.
+- [x] P2 — `Frames\PetHappinessPanel.lua`: frame, hooks on `PetFrameHappiness` + badge, combat gating, 1 s ticker while shown.
+      Layout after owner passes: face / mood + dim tier / value · happiness bar on a grey track with floor ticks and `~5m 12s` INSIDE the
+      draining segment · full-width blue XP bar, 5 divisions, `cur / max  pct%` inside · training points (left) + damage % (right).
+      No loading gate (it stalled: UNIT_PET re-armed the 5 s settle on every pet event; settle now arms only on no-pet → pet).
+      Background alpha 0.72. Settings on the Pet frame section: panel on/off, **Shift-only** (MODIFIER_STATE_CHANGED shows/hides while hovered).
+- [x] P3 — XP row via **`Client.PetExperience()`** (INTERFACE method; Era = `GetPetExperience()` cur,max gated on `HasPetUI()` hunter pet, as
+      Blizzard's `Vanilla/PetPaperDollFrame.lua` reads it; Forever = nil). The green bar under the pet frame was BTT.Kuro's `PetXP.lua`, not
+      Blizzard's; owner turned it off in BTT's settings. VFS does not touch other addons' frames (a BTT-side defer hook was tried and reverted).
 - [ ] P3b — Training points row: unspent count always; green/grey via optional `BeastTrainingTrackerKuro_API.TeachableNow()` (add to the fork), else green when unspent >= 1 with a hint.
-- [ ] P4 — Persistence in `VelocityFrameStyleDB.petHappiness`; `/vfs status` line with tier, decay rate, floors, samples.
-- [ ] P5 — Owner play-test: summon, feed low/high food, dismiss, zone, enter combat with panel open; then commit with HPH credit in TOC `## X-Credits`.
+- [x] P4 — Persistence in `VelocityFrameStyleDB.petHappiness` per pet name; `/vfs status` line with tier, decay rate, floors, samples, xp.
+- [ ] P5 — Owner play-test: summon, feed low/high food, dismiss, zone, enter combat with panel open; then commit (HPH credit already in all three TOCs).
 
 ## Open questions
 

@@ -125,4 +125,5 @@ assert(#st7.samples == 5 and st7.mood == nil and st7.lastFedAt == nil)
 
 -- FormatTime
 assert(PH.FormatTime(59) == '0:59' and PH.FormatTime(3661) == '1:01:01')
+assert(PH.FormatShort(42) == '42s' and PH.FormatShort(312) == '5m 12s' and PH.FormatShort(3720) == '1h 02m')
 print('PASS: enum index + dead-slot rejection, measured drain EMA with resets, floor learning + zone guard, settle, learned-tier samples/ETA, dismiss/death, persistence')

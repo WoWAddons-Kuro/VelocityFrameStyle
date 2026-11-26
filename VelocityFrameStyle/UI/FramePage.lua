@@ -2,7 +2,7 @@
 -- block (Enabled, overrides, the text-element grid, frame extras). Today every section goes on the single options page;
 -- the back-pocket sub-page tree (spec) would call this with a child canvas instead - nothing else changes.
 local ADDON_NAME, VFS = ...
-local Util, DB, Widgets, MediaPicker, Format = VFS.Util, VFS.DB, VFS.Widgets, VFS.MediaPicker, VFS.Format
+local Util, Client, DB, Widgets, MediaPicker, Format = VFS.Util, VFS.Client, VFS.DB, VFS.Widgets, VFS.MediaPicker, VFS.Format
 
 local FramePage = {}
 VFS.FramePage = FramePage
@@ -116,6 +116,13 @@ function FramePage.BuildFrameSection(content, id)
   for i = 1, maxRows do box:Add(ElementRow(box, id, i), 26, -2) end
 
   -- Frame extras
+  if id == "pet" and Client.PetHappinessFrame and Client.PetHappinessFrame() then
+    box:Add(Widgets.Check(box, "Pet info panel on mouse-over",
+      "Hover the happiness icon or the pet's level badge (out of combat) for happiness, time to the next mood, XP and training points.",
+      function() return DB.Global().petHappinessPanel ~= false end, function(v) DB.Global().petHappinessPanel = v end), 26, -8)
+    box:Add(Widgets.Check(box, "Only show the pet info panel while Shift is held", nil,
+      function() return DB.Global().petHappinessPanelShiftOnly == true end, function(v) DB.Global().petHappinessPanelShiftOnly = v end), 26)
+  end
   if id == "pettarget" then
     box:Add(Widgets.Check(box, "Only show health bar",
       "Hide the pet-target power bar and its text, background and border, including in Edit Mode.",

@@ -65,6 +65,17 @@ VFS.ClientFlavours.classic_era = {
     if id == "pettarget" then local f = Root(id); return f and f.skull end
   end,
   PetHappinessFrame = function() return PetFrameHappiness end,
+  -- Verified against Blizzard's Classic PetPaperDollFrame.lua: `local currXP, nextXP = GetPetExperience()`. Gated on a
+  -- hunter pet being out (HasPetUI 2nd return), like Blizzard's own pet tab.
+  PetExperience = function()
+    if not GetPetExperience or not UnitExists("pet") then return nil end
+    local _, isHunterPet = HasPetUI()
+    if not isHunterPet then return nil end
+    local cur, max = GetPetExperience()
+    cur, max = Util.PlainNumber(cur, nil), Util.PlainNumber(max, nil)
+    if cur and max and max > 0 then return cur, max end
+    return nil
+  end,
   Portrait = function(id)
     if id == "player" then return PlayerPortrait
     elseif id == "target" then return TargetFramePortrait
