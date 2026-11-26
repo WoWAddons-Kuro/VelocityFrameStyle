@@ -109,6 +109,8 @@ VFS.ClientFlavours.forever = {
     elseif id == "target" then
       local x = TargetContextual()
       return List(x and x.HighLevelTexture, x and x.BossIcon)
+    elseif id == "pet" then
+      return List(VFS.Client.PetHappinessFrame())
     end
     return {}
   end,
@@ -116,8 +118,21 @@ VFS.ClientFlavours.forever = {
     if id == "target" then return P(TargetContextual(), "HighLevelTexture") end
     if id == "pettarget" then local f = Root(id); return f and f.skull end
   end,
-  PetHappinessFrame = function() return nil end,   -- Mainline-based pet frame: no happiness
-  PetExperience = function() return nil end,       -- no pet levelling on this client
+  -- Forever (Camelot) keeps hunter-pet happiness and loyalty (owner screenshot 2026-11-26: "Happy - 125% damage -
+  -- Gaining Loyalty" on the pet frame). Mainline_PetFrame.xml has no happiness region; Camelot injects it in code we
+  -- have not fetched, so resolve the Era global first, then the plausible parentKeys. nil = no happiness on this build.
+  PetHappinessFrame = function()
+    return PetFrameHappiness or P(PetFrame, "Happiness") or P(PetFrame, "HappinessIcon") or P(PetFrame, "PetHappiness")
+  end,
+  PetExperience = function()
+    if not GetPetExperience or not UnitExists("pet") then return nil end
+    local _, isHunterPet = HasPetUI()
+    if not isHunterPet then return nil end
+    local cur, max = GetPetExperience()
+    cur, max = Util.PlainNumber(cur, nil), Util.PlainNumber(max, nil)
+    if cur and max and max > 0 then return cur, max end
+    return nil
+  end,
   Portrait = function(id)
     if id == "player" then return P(PlayerFrame, "PlayerFrameContainer.PlayerPortrait")
     elseif id == "target" then return P(TargetFrame, "TargetFrameContainer.Portrait")
