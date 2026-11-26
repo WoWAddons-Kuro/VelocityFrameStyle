@@ -94,58 +94,29 @@ function Chrome.Create(st)
     rings[kind] = ring
   end
 
-  -- THE FRAME-LEVEL STACK (owner, Era 2026-11-25, measured with /vfs stack). Texture draw layers cannot beat a higher
-  -- frame level, so order is fixed with frame levels, lowest first:
-  --   holder (plate disc)  <  portraitLayer (portrait + black rim)  <  glowFrame (portrait rim glow)
-  --   <  LOWEST BAR BACKDROP  <  bars  <  bar rings  <  bar glow rings  <  adornment (badge)  <  host.top (text)
-  -- EVERYTHING in the portrait group - plate disc, portrait, its rim, its glow - lives BELOW the lowest bar backdrop,
-  -- so the bars and the name banner always cover it. The earlier rule "portrait above glow, glow above holder" let the
-  -- portrait float ABOVE the bars whenever Blizzard's bar level was low (Era: bars L1, backdrops L0): the pin was a
-  -- no-op. Now the ceiling is the bar backdrop and the group is stacked DOWN from it. Levels can't go below 0, so when
-  -- the backdrop is at 0 the group collapses onto 0 and relies on draw layers (plate BACKGROUND-8/-7, portrait BORDER,
-  -- rim ARTWORK+7, glow disc ARTWORK on its own frame) - still under the backdrop's BACKGROUND-8 surface? No: equal
-  -- frame level, so we raise the BARS instead: FrameBase.EnsureBarHeadroom lifts every bar (and its backdrop/ring) by
-  -- the shortfall ONCE at creation, before anything else measures them. That is the only Blizzard level we touch and it
-  -- is a relative bump, not an absolute value. The portrait keeps its original visibility parent and anchors.
+  -- THE STACK (owner, Era 2026-11-26, after three rounds of chasing Blizzard's bar levels). The portrait group - plate
+  -- disc, portrait, black rim, rim glow - goes on a LOWER STRATA than the bars, not a lower level. Strata beats level
+  -- unconditionally, so it no longer matters that Blizzard re-levels TargetFrame's bars on every target change (they
+  -- dropped back to L1 after every lift we made). We never touch a Blizzard bar's level again.
+  --   BACKGROUND strata: holder L1 (plate)  <  portraitLayer L2 (portrait + rim)  <  glowFrame L3 (rim glow)
+  --   LOW strata (the bars' own): bar backdrops  <  bars  <  bar rings  <  bar glow rings  <  adornment (badge)  <  text
+  -- Caveat: BACKGROUND strata frames sit under every LOW-strata frame on screen, not just ours - so a LOW-strata
+  -- element from another addon over the portrait would cover it. Acceptable: nothing else lives over the unit frames.
+  -- The portrait keeps its original visibility parent and anchors; only its drawing parent moves.
+  local GROUP_STRATA = "BACKGROUND"
   if portrait then
     local originalParent = portrait:GetParent()
     local portraitLayer = CreateFrame("Frame", nil, originalParent)
     portraitLayer:SetAllPoints(originalParent)
     portraitLayer:EnableMouse(false)
     st.portraitLayer = portraitLayer
-    local function LowestBarBackdropLevel()
-      local lowest
-      for _, bar in pairs(st.bars) do
-        local lvl = bar.stock.vfsBackdrop and bar.stock.vfsBackdrop:GetFrameLevel() or bar.stock:GetFrameLevel()
-        if not lowest or lvl < lowest then lowest = lvl end
-      end
-      return lowest
-    end
-    -- The portrait group needs 3 levels under the lowest bar backdrop: holder, portraitLayer, glowFrame.
-    local GROUP = 3
-    local syncing = false
     local function SyncPortraitLayer()
-      -- Re-entrancy: EnsureBarHeadroom lifts the bars one by one and each SetFrameLevel fires this hook again while
-      -- the others are still at the old level, so a mid-lift read gave ceiling 0..2 and ceiling-3 went negative ->
-      -- SetFrameLevel threw -> Target.Create aborted with no slots (owner, Era 2026-11-25). One pass at a time.
-      if syncing then return end
-      syncing = true
-      local ceiling = LowestBarBackdropLevel() or (hb:GetFrameLevel())
-      if ceiling < GROUP then
-        VFS.FrameBase.EnsureBarHeadroom(st, GROUP - ceiling)
-        ceiling = LowestBarBackdropLevel() or hb:GetFrameLevel()
-      end
-      -- Frame levels are unsigned. If a client leaves us no room even after the lift (headroom already applied for a
-      -- different reason, or a bar parented where it cannot move) clamp at 0 rather than throw: a flat stack is a
-      -- cosmetic fault, an aborted Create loses the whole frame.
-      local base = math.max(0, ceiling - GROUP)
-      local strata = hb:GetFrameStrata()
-      holder:SetFrameStrata(strata);        holder:SetFrameLevel(base)
-      portraitLayer:SetFrameStrata(strata); portraitLayer:SetFrameLevel(base + 1)
-      glowFrame:SetFrameStrata(strata);     glowFrame:SetFrameLevel(base + 2)
-      -- Everything painted over the portrait (rim, level badge) must follow it up: one audited sync in FrameBase.
+      -- Fixed, absolute, and independent of the bars. Nothing here can go negative or race a Blizzard re-level.
+      holder:SetFrameStrata(GROUP_STRATA);        holder:SetFrameLevel(1)
+      portraitLayer:SetFrameStrata(GROUP_STRATA); portraitLayer:SetFrameLevel(2)
+      glowFrame:SetFrameStrata(GROUP_STRATA);     glowFrame:SetFrameLevel(3)
+      -- The badge and text live on the bars' strata and must still clear the bars' rings: one audited sync.
       VFS.FrameBase.SyncAdornmentLevels(st)
-      syncing = false
     end
     SyncPortraitLayer()
     portrait:SetParent(portraitLayer)
@@ -153,7 +124,8 @@ function Chrome.Create(st)
     VFS.FrameBase.AttachPortraitRim(st, portraitLayer)
     VFS.FrameBase.SyncAdornmentLevels(st)
     st.syncPortraitLayer = SyncPortraitLayer
-    for _, bar in pairs(st.bars) do hooksecurefunc(bar.stock, "SetFrameLevel", SyncPortraitLayer) end
+    -- Blizzard may re-strata the portrait's ORIGINAL parent chain; if it ever drags our layer with it, re-pin.
+    for _, bar in pairs(st.bars) do hooksecurefunc(bar.stock, "SetFrameLevel", function() VFS.FrameBase.SyncAdornmentLevels(st) end) end
   end
 
   st.chrome = { holder = holder, disc = disc, discSoft = discSoft, plate = plate,

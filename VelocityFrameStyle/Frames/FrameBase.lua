@@ -305,28 +305,16 @@ function FrameBase.AttachPortraitRim(st, portraitLayer)
   rim:Show()
 end
 
--- Chrome needs N free frame levels UNDER the lowest bar backdrop for the portrait group (plate, portrait, glow). Era
--- gives the bars L1 with backdrops at L0, so there is no room: lift every bar - and with it its backdrop (bar-1) and
--- ring (bar+offset) via the SetFrameLevel hooks AcquireBackdrop installed - by `by` levels. Relative, once, at
--- creation, before anything measures the bars. This is the ONLY place we change a Blizzard bar's frame level.
-function FrameBase.EnsureBarHeadroom(st, by)
-  if not by or by <= 0 or st.barHeadroomApplied then return end
-  st.barHeadroomApplied = by
-  -- Lift from the pre-read levels so a hook that re-levels a sibling mid-loop cannot double-count.
-  local targets = {}
-  for _, bar in pairs(st.bars) do targets[bar.stock] = bar.stock:GetFrameLevel() + by end
-  for stock, level in pairs(targets) do stock:SetFrameLevel(level) end
-  -- The lift ran inside a sync that holds the reentrancy guard; re-run the audit explicitly once it is released.
-  st.syncingAdornment = nil
-  FrameBase.SyncAdornmentLevels(st)
-end
+-- (EnsureBarHeadroom / AssertBarHeadroom removed 2026-11-26. We no longer lift Blizzard's bars to make room under
+-- them: the portrait group lives on the BACKGROUND strata instead - see Chrome.Create. Blizzard re-levelled
+-- TargetFrame's bars on every target change and undid every lift; strata cannot be undone by a level change.)
 
 -- THE level audit, in one place (owner, Era 2026-11-25, measured with /vfs stack):
 --   portrait group (plate < portrait+rim < glow)  <  bar backdrops  <  bars  <  bar rings  <  bar glow rings
 --   <  adornment (badge)  <  host.top (text)
 -- The badge floor is the highest of: every bar's glow ring + 1 (which already sits above that bar's upper border).
 -- The portrait's parent is deliberately NOT a floor any more: it lives below the bars by design.
--- Re-run after anything relevels the bars (Blizzard, predictions, EnsureBarHeadroom), the text host, or on every
+-- Re-run after anything relevels the bars (Blizzard, predictions), the text host, or on every
 -- appearance pass.
 function FrameBase.SyncAdornmentLevels(st)
   local adornment, portrait = st.adornment, Client.Portrait(st.id)
@@ -341,7 +329,7 @@ function FrameBase.SyncAdornmentLevels(st)
   if st.chrome and st.chrome.glow then
     for _, ring in pairs(st.chrome.glow.rings or {}) do floor = math.max(floor, ring:GetFrameLevel() + 1) end
   end
-  -- The text host must ALSO clear every bar, independently of the badge: after EnsureBarHeadroom lifted the Era bars
+  -- The text host must ALSO clear every bar, independently of the badge: when the bars were once lifted (since reverted)
   -- by 3, host.top (set once at Acquire from the ORIGINAL bar level) ended up level with the bars and the health
   -- value vanished under the fill (owner 2026-11-25). Raise it to the same floor first; never lower it.
   if st.host.top:GetFrameLevel() < floor then st.host.top:SetFrameLevel(floor) end
