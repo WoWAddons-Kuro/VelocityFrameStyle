@@ -240,6 +240,9 @@ function FrameBase.RefreshPowerVisibility(st)
   power.stock:SetAlpha(absent and 0 or 1)
   power.backdrop:SetAlpha(absent and 0 or 1)
   power.backdrop.ring:SetAlpha(absent and 0 or 1)
+  -- The combat glow ring duplicates this bar's outline; it must vanish with the bar, not throb over an empty slot.
+  local glowRing = st.chrome and st.chrome.glow and st.chrome.glow.rings and st.chrome.glow.rings.power
+  if glowRing then glowRing:SetAlpha(absent and 0 or 1) end
   if absent then
     st.slots.power = nil
     st.slots.below = st.bars.health and st.bars.health.stock

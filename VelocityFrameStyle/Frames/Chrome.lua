@@ -1,9 +1,9 @@
 -- Velocity Frame Style: portrait disc and combat glow. FrameBase owns each bar's
 -- four-layer surface stack. No opaque card plate may cover those translucent surfaces.
 --
--- The portrait stays above the glow. The bar-stack outline has an empty centre.
+-- The portrait stays above the glow. Combat glow = tinted duplicate of each bar's upper outline + portrait rim.
 --
--- VFS_Chrome = { holder, disc, discSoft, plate (invisible envelope), glow = { frame, disc, plate, anim } }
+-- VFS_Chrome = { holder, disc, discSoft, plate (invisible stack envelope), glow = { frame, disc, rings = { [kind] = border }, anim } }
 local ADDON_NAME, VFS = ...
 local Util, Client, DB = VFS.Util, VFS.Client, VFS.DB
 
@@ -28,6 +28,10 @@ Chrome.LAYOUT = {
   pettarget = { health = { w = 113, h = 24 }, power = { w = 113, h = 12 }, nameRow = 12, platePad = 4, discPad = 5, plateOverlap = 1.0, side = "left" },
 }
 -- side = which side of the portrait the bars sit on: "right" (player/pet: portrait left) | "left" (target: portrait right)
+
+-- Combat outline thickness = the black border's thickness, so FrameBase.CreateSurfaceBorder picks the rounded atlas
+-- renderer and the red ring has exactly the border's corner radii. (Was 2 = the square flat fallback.)
+Chrome.COMBAT_OUTLINE_THICKNESS = VFS.FrameBase and VFS.FrameBase.BAR_BORDER_WIDTH or 6
 
 local function PlateColor()
   local g = DB.Global()
@@ -59,17 +63,33 @@ function Chrome.Create(st)
   local plate = CreateFrame("Frame", nil, holder)
   plate:EnableMouse(false)
 
-  -- Circular portrait glow plus a flat, empty-centred bar-stack outline.
+  -- Circular portrait glow plus a throbbing tinted DUPLICATE of every bar's upper outline (owner, Era 2026-11-25): one
+  -- glow ring per bar, same rounded atlas, same inner rect, drawn one level above that bar's black ring. Not an envelope
+  -- around the whole stack - the glow matches the outlines that clip the bars. Rings are created per bar below; all of
+  -- them live on glowFrame, whose alpha the bounce animation drives.
   local glowFrame = CreateFrame("Frame", nil, holder)
   glowFrame:SetAllPoints(holder)
   glowFrame:SetFrameLevel(holder:GetFrameLevel() + 2)
   local gDisc = glowFrame:CreateTexture(nil, "ARTWORK"); gDisc:SetTexture(SOFT_DISC); gDisc:SetBlendMode("ADD")
-  local gPlate = VFS.FrameBase.CreateSurfaceBorder(glowFrame, plate, 2)
-  gPlate:SetFrameLevel(glowFrame:GetFrameLevel())
   glowFrame:SetAlpha(0)
   local anim = glowFrame:CreateAnimationGroup()
   anim:SetLooping("BOUNCE")
   local a1 = anim:CreateAnimation("Alpha"); a1:SetFromAlpha(0.35); a1:SetToAlpha(1); a1:SetDuration(0.8)
+  -- Per-bar glow rings. Parented to glowFrame (inherits its alpha) but levelled with the bar so each sits just above
+  -- that bar's upper black ring, which FrameBase keeps at bar level + vfsBorderLevelOffset (1, or 2 with predictions).
+  local rings = {}
+  for kind, bar in pairs(st.bars) do
+    local stock = bar.stock
+    local ring = VFS.FrameBase.CreateSurfaceBorder(glowFrame, stock, Chrome.COMBAT_OUTLINE_THICKNESS)
+    local function SyncLevel()
+      ring:SetFrameStrata(stock:GetFrameStrata())
+      ring:SetFrameLevel(stock:GetFrameLevel() + (stock.vfsBorderLevelOffset or 1) + 1)
+    end
+    SyncLevel()
+    hooksecurefunc(stock, "SetFrameLevel", SyncLevel)
+    hooksecurefunc(stock, "SetFrameStrata", SyncLevel)
+    rings[kind] = ring
+  end
 
   -- Texture draw layers cannot beat a higher FRAME level. In particular pet and
   -- pet-target portraits belonged to the button itself, below our glow child.
@@ -92,7 +112,7 @@ function Chrome.Create(st)
   end
 
   st.chrome = { holder = holder, disc = disc, discSoft = discSoft, plate = plate,
-                glow = { frame = glowFrame, disc = gDisc, plate = gPlate, anim = anim } }
+                glow = { frame = glowFrame, disc = gDisc, rings = rings, anim = anim } }
   Chrome.Layout(st)
   Chrome.ApplyColors(st)
   return st.chrome
@@ -130,7 +150,7 @@ function Chrome.ApplyColors(st)
   c.discSoft:SetVertexColor(r, g, b, a * 0.35)
   local gc = DB.Global().combatGlowColor or { 1, 0.1, 0.1 }
   c.glow.disc:SetVertexColor(gc[1], gc[2], gc[3], 0.7)
-  c.glow.plate:SetBorderColor(gc[1], gc[2], gc[3], 0.7)
+  for _, ring in pairs(c.glow.rings) do ring:SetBorderColor(gc[1], gc[2], gc[3], 0.7) end
 end
 
 -- Combat glow: shown while the unit is in combat (same signal Blizzard's flash uses) -----------------------
