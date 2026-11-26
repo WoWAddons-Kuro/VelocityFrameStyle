@@ -68,6 +68,14 @@ function TextLayout.ColorFor(e, unit, stockFS)
   elseif mode == "difficulty" then
     local level = Util.PlainNumber(UnitLevel(unit), nil)
     if level == nil or level < 0 then return 1, 0.1, 0.1 end
+    -- Our own pet (owner, Era 2026-11-26): the enemy difficulty scale is the wrong message for a pet. A pet that
+    -- has fallen behind is a PROBLEM, so: yellow at the player's level or one below, red any further behind,
+    -- never green or grey. Pets can't out-level the player; treat >= as "caught up" (yellow).
+    if UnitIsUnit(unit, "pet") then
+      local mine = Util.PlainNumber(UnitLevel("player"), nil)
+      if mine and level < mine - 1 then return 1, 0.1, 0.1 end
+      return 1, 0.82, 0
+    end
     return VFS.Client.DifficultyColor(level)
   elseif mode == "class" then
     local c = ClassColor(unit)
