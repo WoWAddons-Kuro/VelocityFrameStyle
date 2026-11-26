@@ -328,6 +328,7 @@ local function Slash(msg)
     else DumpPredictions() end
   elseif cmd == "layers" then DumpLayers(arg ~= "" and arg or "player")
   elseif cmd == "stack" then DumpStack(arg ~= "" and arg or "target")
+  elseif msg == "pethappiness" or msg == "pethappy" then VFS.PetHappinessPanel.Dump()
   elseif msg == "editmode" or msg == "edit" then VFS.EditMode.Open()
   elseif msg == "restyle" then VFS.FrameBase.RestyleAll(); Util.Print("restyled")
   else VFS.Options.Open() end

@@ -65,6 +65,7 @@ VFS.ClientFlavours.classic_era = {
     if id == "pettarget" then local f = Root(id); return f and f.skull end
   end,
   PetHappinessFrame = function() return PetFrameHappiness end,
+  HasReadablePetHappiness = function() return true end,   -- UnitPower("pet", 27) -> 976 / 1000 plain (2026-11-25)
   -- Verified against Blizzard's Classic PetPaperDollFrame.lua: `local currXP, nextXP = GetPetExperience()`. Gated on a
   -- hunter pet being out (HasPetUI 2nd return), like Blizzard's own pet tab.
   PetExperience = function()

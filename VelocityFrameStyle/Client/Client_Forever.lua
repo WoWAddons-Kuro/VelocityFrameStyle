@@ -121,9 +121,14 @@ VFS.ClientFlavours.forever = {
   -- Forever (Camelot) keeps hunter-pet happiness and loyalty (owner screenshot 2026-11-26: "Happy - 125% damage -
   -- Gaining Loyalty" on the pet frame). Mainline_PetFrame.xml has no happiness region; Camelot injects it in code we
   -- have not fetched, so resolve the Era global first, then the plausible parentKeys. nil = no happiness on this build.
+  -- The icon is re-anchored beside our bars (Frames\Pet.lua) but its stock tooltip is left alone: see below.
   PetHappinessFrame = function()
     return PetFrameHappiness or P(PetFrame, "Happiness") or P(PetFrame, "HappinessIcon") or P(PetFrame, "PetHappiness")
   end,
+  -- /vfs pethappiness on Forever 2026-11-26: Enum.PowerType.Happiness=27, UnitPowerMax(pet,27)=1000 plain but
+  -- UnitPower(pet,27) is SECRET. No drain, floors or countdown can be computed, so the happiness model is off here;
+  -- the hover panel (level badge only) shows pet XP, and Blizzard's own icon tooltip keeps the mood/damage/diet text.
+  HasReadablePetHappiness = function() return false end,
   PetExperience = function()
     if not GetPetExperience or not UnitExists("pet") then return nil end
     local _, isHunterPet = HasPetUI()

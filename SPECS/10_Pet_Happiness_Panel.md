@@ -22,7 +22,11 @@ by food level gap (within 5 / 6-10 / 11+ below pet), up to 10 ticks over 20 s. T
 
 ## Decisions
 
-- Era only. Gate: `Client.PetHappinessFrame()` non-nil **and** `HasPetUI()` reports a hunter pet. Forever: no panel, no code paths run.
+- Gate: `Client.PetHappinessFrame()` non-nil **and** `HasPetUI()` reports a hunter pet. **Forever (owner 2026-11-26):** the icon
+  exists (resolved by the Forever adapter and re-anchored beside our bars) but `UnitPower("pet", 27)` is **secret** (`/vfs pethappiness`:
+  max 1000 plain, value `<secret>`; `GetPetHappiness()` -> 3, 125, 20 plain). No drain/floors/countdown is computable, so there
+  `Client.HasReadablePetHappiness()` is false: Blizzard's icon tooltip is left alone (mood, damage, diet) and our panel, from the
+  level badge only, shows the **pet XP bar alone**. The happiness model and its events do not run on Forever.
 - Our own frame (`VFS_PetHappinessPanel`), not GameTooltip - it holds two status bars and tick marks. Blizzard's
   `PetFrameHappiness` OnEnter/OnLeave are **HookScript**ed; inside we hide GameTooltip and show ours.
 - Triggers: hover the happiness icon OR the Pet frame's level badge (`st.portraitBadge`, EnableMouse(true) + OnEnter/OnLeave).

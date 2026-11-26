@@ -149,6 +149,26 @@ local function TrainingPointsLine()
   return string.format("|cff40ff40%d training points unspent|r", unspent)
 end
 
+local function XpOnly() return not Client.HasReadablePetHappiness() end
+
+-- Pet XP: blue fill on the grey track, 5 divisions, text centred. Shared by the full panel and the XP-only panel.
+local function RefreshXp()
+  local cur, max = Client.PetExperience()
+  local xw = frame.xp:GetWidth() or 0
+  for _, m in ipairs(frame.xp.marks) do m.tex:ClearAllPoints(); m.tex:SetPoint("CENTER", frame.xp, "LEFT", xw * m.frac, 0) end
+  if cur then
+    frame.xp:SetValue(cur / max)
+    local fmt = BreakUpLargeNumbers or tostring
+    frame.xpText:SetText(string.format("%s / %s   %d%%", fmt(cur), fmt(max), math.floor(cur / max * 100 + 0.5)))
+  else
+    frame.xp:SetValue(0); frame.xpText:SetText("XP unavailable")
+  end
+  if XpOnly() then
+    local barInset = VFS.FrameBase.BAR_BORDER_WIDTH
+    frame:SetHeight(PAD + barInset + XP_H + barInset + PAD)
+  end
+end
+
 local function Refresh()
   if not frame or not frame:IsShown() or not state then return end
   local now = GetTime()
@@ -219,6 +239,7 @@ local function CanShow()
   -- Optional gate: only while Shift is held, so a casual mouse-over of the pet frame does not pop the panel.
   if DB.Global().petHappinessPanelShiftOnly and not IsShiftKeyDown() then return false end
   if not Client.PetHappinessFrame() then return false end
+  if XpOnly() then return Client.PetExperience() ~= nil end
   local r = PH.Read(GetTime())
   return r ~= nil
 end
@@ -232,15 +253,24 @@ local function StopTicker() if ticker then ticker:Cancel(); ticker = nil end end
 function Panel.ShowAt(anchor)
   if not CanShow() then return end
   Build()
+  ApplyTheme()
+  frame:ClearAllPoints()
+  frame:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, -6)
+  if XpOnly() then
+    frame.face:Hide(); frame.mood:Hide(); frame.tier:Hide(); frame.value:Hide()
+    frame.happy:Hide(); frame.happy.border:Hide(); frame.tp:Hide(); frame.damage:Hide()
+    frame.xp:ClearAllPoints()
+    frame.xp:SetPoint("TOPLEFT", frame, "TOPLEFT", PAD + VFS.FrameBase.BAR_BORDER_WIDTH, -(PAD + VFS.FrameBase.BAR_BORDER_WIDTH))
+    frame.xp:SetPoint("RIGHT", frame, "RIGHT", -(PAD + VFS.FrameBase.BAR_BORDER_WIDTH), 0)
+    frame:Show(); RefreshXp(); StartTicker()
+    return
+  end
   local petName = Util.Plain(UnitName("pet"))
   if not state or persistKey ~= petName then
     if state then SaveState() end
     state = LoadState(petName); persistKey = petName
     PH.MarkSummoned(state, GetTime() - PH.SUMMON_SETTLE_SEC)   -- hover is never mid-summon; read now
   end
-  ApplyTheme()
-  frame:ClearAllPoints()
-  frame:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, -6)
   frame:Show()
   Refresh()
   StartTicker()
@@ -306,8 +336,15 @@ function Panel.Setup()
   if not Client.PetHappinessFrame then return false end
   local icon = Client.PetHappinessFrame()
   if not icon then VFS.features["PetHappinessPanel"] = false; return false end
-  HookTrigger(icon)
   local pet = VFS.Frames.pet
+  -- Where the happiness value is secret (Forever) Blizzard's icon tooltip stays the only mood display; our panel is
+  -- reached from the level badge only and shows pet XP alone.
+  if XpOnly() then
+    if pet and pet.portraitBadge then HookTrigger(pet.portraitBadge) end
+    VFS.features["PetHappinessPanel"] = "xp-only"
+    return true
+  end
+  HookTrigger(icon)
   if pet and pet.portraitBadge then HookTrigger(pet.portraitBadge) end
   events:SetScript("OnEvent", function(...) local ok, err = pcall(OnEvent, ...); if not ok then Util.Raise("pethappiness", err) end end)
   events:RegisterUnitEvent("UNIT_PET", "player")

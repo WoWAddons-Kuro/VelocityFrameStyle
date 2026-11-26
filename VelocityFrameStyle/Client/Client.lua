@@ -31,6 +31,9 @@ Client.INTERFACE = {
   "ClassificationIcon",   -- (frameID) -> Texture|nil     skull (HighLevelTexture) - re-anchored onto our level badge
   "PetHappinessFrame",    -- () -> Frame|nil   Era hunter-pet happiness (PetFrameHappiness): functional, kept, and re-anchored
                           --                   beside our pet bars by Frames\Pet.lua. nil on clients without pet happiness.
+  "HasReadablePetHappiness", -- () -> bool   can Lua read UnitPower(pet, Happiness)? Era yes; Forever NO (the value is secret,
+                          --                   verified 2026-11-26) so the panel there is XP-only and Blizzard's icon tooltip
+                          --                   is left alone.
   "PetExperience",        -- () -> cur, max | nil   hunter-pet XP toward the next pet level. Era: GetPetExperience() (the pair
                           --                   Blizzard's PetPaperDollFrame reads). nil when there is no hunter pet or no pet XP on this client.
   "Portrait",             -- (frameID) -> Texture|nil
