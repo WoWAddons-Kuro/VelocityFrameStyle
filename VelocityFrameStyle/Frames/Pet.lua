@@ -15,6 +15,21 @@ local function PlaceBars(st)
   if pb and hb then Geometry.PlaceBar("pet", pb, { point = "TOPLEFT", relTo = hb, relPoint = "BOTTOMLEFT", x = 0, y = -FrameBase.BAR_BORDER_WIDTH, width = L.health.w, height = L.power.h }) end
 end
 
+-- Era hunter-pet happiness (keep-list, functional): Blizzard anchors it to PetFrame's RIGHT edge, which never follows
+-- our resized bars. Hang it off the health bar's right border instead so changing bar width moves it along. ONE anchor
+-- only: its texture is setAllPoints, so a second anchor would stretch the art (owner saw a distorted icon 2026-11-25).
+-- Size is never touched. Unprotected frame; legal in combat. No-op on clients without happiness.
+local HAPPINESS_GAP = 2
+local function PlaceHappiness(st)
+  local happiness = Client.PetHappinessFrame()
+  local hb = FrameBase.Bar(st, "health")
+  if not happiness or not hb then return end
+  happiness:ClearAllPoints()
+  -- Centre on the health bar's right border edge, offset so the icon sits just outside it.
+  happiness:SetPoint("LEFT", hb, "RIGHT", FrameBase.BAR_BORDER_WIDTH + HAPPINESS_GAP, 0)
+end
+Pet.PlaceHappiness = PlaceHappiness
+
 function Pet.Create()
   local st = FrameBase.Acquire("pet")
   if not st then return end
@@ -22,9 +37,10 @@ function Pet.Create()
   local hb, pb = FrameBase.Bar(st, "health"), FrameBase.Bar(st, "power")
   st.slots = { health = hb, power = pb, nameplate = hb and FrameBase.NameRowAbove(st, hb, 11, 1), above = hb, below = pb or hb }
   FrameBase.HookCommon(st)
-  if PetFrame.Update then hooksecurefunc(PetFrame, "Update", function() PlaceBars(st); FrameBase.Restyle("pet") end) end
-  if PetFrame_Update then hooksecurefunc("PetFrame_Update", function() PlaceBars(st); FrameBase.Restyle("pet") end) end
+  if PetFrame.Update then hooksecurefunc(PetFrame, "Update", function() PlaceBars(st); FrameBase.Restyle("pet"); PlaceHappiness(st) end) end
+  if PetFrame_Update then hooksecurefunc("PetFrame_Update", function() PlaceBars(st); FrameBase.Restyle("pet"); PlaceHappiness(st) end) end
   FrameBase.Restyle("pet")
+  PlaceHappiness(st)
   return st
 end
 

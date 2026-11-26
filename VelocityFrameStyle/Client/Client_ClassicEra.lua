@@ -53,16 +53,18 @@ VFS.ClientFlavours.classic_era = {
     elseif id == "pettarget" then local f = Root(id); return List(f and f.texture, f and f.nameBackground) end
     return {}
   end,
-  -- Keep-list: rest zzz, combat swords, skull
+  -- Keep-list: rest zzz, combat swords, skull, hunter-pet happiness (functional UI; placed by Frames\Pet.lua)
   KeepRegions = function(id)
     if id == "player" then return List(PlayerRestIcon, PlayerAttackIcon)
-    elseif id == "target" then return List(TargetFrameTextureFrameHighLevelTexture) end
+    elseif id == "target" then return List(TargetFrameTextureFrameHighLevelTexture)
+    elseif id == "pet" then return List(PetFrameHappiness) end
     return {}
   end,
   ClassificationIcon = function(id)
     if id == "target" then return TargetFrameTextureFrameHighLevelTexture end
     if id == "pettarget" then local f = Root(id); return f and f.skull end
   end,
+  PetHappinessFrame = function() return PetFrameHappiness end,
   Portrait = function(id)
     if id == "player" then return PlayerPortrait
     elseif id == "target" then return TargetFramePortrait
