@@ -66,6 +66,32 @@
 - [ ] Verify disabling styling restores the intended native regions without leaving opaque overlays or active suppression behind.
 - [ ] Update adapter/API notes with **observed build-specific results**, close only confirmed items, and commit owner-approved phases individually.
 
+## Visual cleanup list — AFTER E0–E5 are confirmed on Classic Era
+
+Owner-requested polish, 2026-11-25. **Not part of the refactor gates**; start only once E5 has passed on both clients. Each item is its own
+publish → play-test → commit round. Items marked *(spec first)* need a short decision note (or a new numbered SPEC) before code.
+
+- [ ] **Combat glow = tinted duplicate of every bar outline** *(implemented 2026-11-25, awaiting owner in-game confirmation; pulled forward
+      from the cleanup list because the Era test exposed it)*. Was a 2-unit flat square envelope around the stack. Now `Chrome.Create` builds
+      one rounded-atlas ring per bar (`glow.rings[kind]`, same inner rect, one level above that bar's black ring), tinted `combatGlowColor`,
+      all on the throbbing `glowFrame`. `FrameBase.RefreshPowerVisibility` zeroes `glow.rings.power` with the power bar on Target / Pet Target.
+      Open: if 0.7-alpha red hides the black outline at peak throb, lower it; a feathered soft-glow atlas variant remains a later option.
+- [ ] **"Portrait adornment" position for text elements.** Keep the existing per-element *Position* setting (nameplate / health / power /
+      above / below / hidden) and add one more anchor value, **portrait adornment**: a small gold-ringed circle (our own disc + ring art, not
+      Blizzard's alpha-zeroed `LevelBackgroundCircle`) overlapping the portrait disc's **lower-left** edge, as the old VelocityPetTargetFrame
+      drew its level (owner reference, Era 2026-11-25). Anchored to the portrait, so bar dimensions never move it. Intended for the Level
+      element (default it there on Player and Pet; Pet level is our text from `UnitLevel`, Blizzard has no pet level region) but any single
+      element may select it. When the Level sits there the badge becomes the Target skull/classification anchor instead of the row text.
+- [ ] **Elite / rare / boss / skull (`??`) verification.** Test the Target level row against each classification: normal, elite, rareelite, rare, worldboss,
+      and over-level `-1` → skull / `??`. Confirm the kept `HighLevelTexture` / `BossIcon` and our level text agree on every client; record findings in 03_Text_Template.md.
+- [ ] **Danger cues from VelocityPlateStyle** *(spec first)*. Port the VPS M2c/M2d behaviours to the Target (and Pet Target) frame: over-level threshold turns
+      the level text skull-red, inline `UI-TargetingFrame-Skull` per level above the player (`skullAtLevelsAbove`), friendly/non-attackable units get no cue.
+      Reuse the `SkullCount` / `IsHostileThreat` logic (shared via copy, not a cross-addon dependency). Whether the animated bar sweep is wanted on unit frames is an open owner decision.
+- [ ] **Border picks** *(spec first)*. Extend `Scripts/GenerateRoundedBorderAtlas.cs` / 06_Rounded_Border_Atlas.md to produce variants: thinner border
+      thickness and smaller corner radius. Expose as a theme setting (with per-frame override, like texture/font). Keep the six-unit layout contract.
+- [ ] **Alternate rectangular layout** *(spec first)*. A square-portrait / straight-bar layout option as an alternative to the current rounded look;
+      decide whether this is a border variant (radius 0) plus portrait mask swap, or a distinct layout preset. Default remains the rounded layout.
+
 ## References and remaining boundaries
 
 - Ground truth: `AddonManagement/_EXTERNAL_APIS/wow_unitframe_regions_forever_vs_era.md`, `wow_edit_mode_layouts_api.md`; `_ref/blizzard/classic_era/{PlayerFrame,TargetFrame,PetFrame}.xml`; `_ref/blizzard/forever/unitframe/`. Some prose is historical: check current source before trusting capability claims.
