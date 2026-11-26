@@ -206,19 +206,27 @@ function FrameBase.NameRowAbove(st, bar, rowHeight, gap)
   return row
 end
 
--- The 'portrait' slot: a small badge (near-black disc + black ring, the bar-border look) riding the portrait disc's
--- lower rim, where the old VelocityPetTargetFrame drew its level (owner, Era 2026-11-25). It sits on the BAR side of
--- the portrait - south-east for Player/Pet/ToT (bars right), south-west for Target/Pet Target (bars left) - so it
--- tucks into the portrait/power-bar transition (owner). Any text element may pick it as its Position (Level does by
--- default); TextLayout centres the element on it and shows the badge only while something is anchored there.
--- Anchored to the portrait, never to the bars, so bar dimensions do not move it.
--- Sized from the portrait diameter so Pet/ToT badges are proportionally smaller than Player/Target.
--- LAYERING: the badge frame must sit BELOW host.top (which owns the FontStrings), never be its child - as a child at a
--- higher level its textures covered the level number (owner, Era 2026-11-25).
+-- PORTRAIT ADORNMENTS (owner, Era 2026-11-25). Two things we draw on the portrait, at DIFFERENT heights:
+--   portrait + RIM (both on Chrome's portraitLayer; rim at a higher draw layer)  <  bars  <  glows
+--     <  adornment frame = BADGE  <  host.top (text)
+-- The rim is part of the portrait, so it tucks UNDER the bars with it; the badge is above everything including both
+-- glows. The rim texture is created here and handed to Chrome's portraitLayer (FrameBase.AttachPortraitRim) once that
+-- frame exists - never on the adornment frame, which drew it over the bars.
+--
+-- * Rim: an opaque ring painted OVER the portrait's edge, the same black as the bar borders. It is the circle surround
+--   that clips square class icons ("class new" portrait style overflowed the disc, owner 2026-11-25) and gives every
+--   portrait the same hard edge. Asset: Assets\portrait_rim.tga (generated, white/alpha, tinted here).
+-- * Badge (the 'portrait' text Position): disc + ring on the portrait's lower rim on the BAR side - south-east for
+--   Player/Pet/ToT, south-west for Target/Pet Target - tucking into the portrait/power-bar transition. Level sits there
+--   by default; TextLayout centres the element on it and shows the badge only while something is anchored there.
+--   Sized from the portrait diameter so Pet/ToT badges are proportionally smaller. Anchored to the portrait, never the
+--   bars, so bar dimensions do not move it.
+-- All shapes are generated white-with-alpha (Scripts\GenerateRoundedBorderAtlas.cs -> VFS.RoundedShapes) and tinted at
+-- runtime, so the black here can become any colour later without new art.
 FrameBase.PORTRAIT_BADGE_SCALE = 0.36   -- disc diameter as a fraction of the portrait diameter (64 -> 23, 37 -> 13)
 FrameBase.PORTRAIT_BADGE_RING  = 0.10   -- ring width as a fraction of the badge diameter (~ the 4px border at 64)
 FrameBase.PORTRAIT_BADGE_OFFSET = 0.0   -- badge centre offset from the rim's 225-degree point, in badge radii (+ = further out)
-local BADGE_DISC = "Interface\\CHARACTERFRAME\\TempPortraitAlphaMask"   -- feathered white disc, tinted
+local function Shapes() return VFS.RoundedShapes end
 local function BadgeMetrics(portrait)
   local pd = portrait:GetWidth() or 60
   local size = math.floor(pd * FrameBase.PORTRAIT_BADGE_SCALE + 0.5)
@@ -229,43 +237,94 @@ local function BadgeMetrics(portrait)
   local along = 0.293 * r - FrameBase.PORTRAIT_BADGE_OFFSET * (size / 2) * 0.7071
   return size, ring, along
 end
+
+-- The rim texture is an annulus from rimInnerRadius to discRadius of a `pixels`-wide image. Scale the image so the
+-- annulus's INNER edge lands exactly on the portrait's edge; the ring width then follows the asset's proportion
+-- (8 px of 54 at a 64 portrait = ~4.7 units, close to the 4-unit bar border). Returns the draw size in UI units.
+local function RimDrawSize(portrait)
+  local s = Shapes()
+  local pd = portrait:GetWidth() or 60
+  local unitsPerPixel = (pd / 2) / s.rimInnerRadius
+  return s.pixels * unitsPerPixel
+end
+
 function FrameBase.PortraitBadge(st)
   if st.portraitBadge then return st.portraitBadge end
   local portrait = Client.Portrait(st.id)
-  if not portrait then return nil end
-  local badge = CreateFrame("Frame", nil, st.button)
+  if not portrait or not Shapes() then return nil end
+  local adornment = CreateFrame("Frame", nil, st.button)
+  adornment:EnableMouse(false)
+  adornment:SetAllPoints(st.button)
+  st.adornment = adornment
+  -- Rim over the portrait edge. Created on the adornment only as a holder; AttachPortraitRim moves it onto the
+  -- portrait's own layer so it stacks WITH the portrait (under the bars), on a draw layer above the portrait texture.
+  adornment.rim = adornment:CreateTexture(nil, "ARTWORK", nil, 7)
+  adornment.rim:SetTexture(Shapes().portraitRim)
+  adornment.rim:SetPoint("CENTER", portrait, "CENTER")
+  adornment.rim:Hide()   -- shown once attached to the portrait layer
+  -- Badge: its own region so TextLayout can anchor text to it and Show/Hide it independently of the rim
+  local badge = CreateFrame("Frame", nil, adornment)
   badge:EnableMouse(false)
   badge.ring = badge:CreateTexture(nil, "BACKGROUND", nil, -2)
-  badge.ring:SetTexture(BADGE_DISC)
+  badge.ring:SetTexture(Shapes().disc)
   badge.ring:SetPoint("CENTER")
   badge.disc = badge:CreateTexture(nil, "BACKGROUND", nil, -1)
-  badge.disc:SetTexture(BADGE_DISC)
+  badge.disc:SetTexture(Shapes().disc)
   badge.disc:SetAllPoints(badge)
   function badge:ApplyColors()
     local g = DB.Global()
     local c = g.plateColor or { 0.02, 0.02, 0.02 }
     self.disc:SetVertexColor(c[1], c[2], c[3], g.plateAlpha or 0.9)   -- same plate as the portrait disc
     self.ring:SetVertexColor(0, 0, 0, 1)                               -- opaque black, like the bar borders
+    adornment.rim:SetVertexColor(0, 0, 0, 1)
   end
-  -- Level: above the portrait's CURRENT parent (Chrome reparents portraits into a raised portraitLayer whose level
-  -- varies per frame - on Target it beat host.top-1 and drew over the badge, owner 2026-11-25) and below host.top,
-  -- which owns the text. Re-synced when either moves.
-  local function SyncLevel()
-    local portraitParent = portrait:GetParent()
-    local floor = (portraitParent and portraitParent.GetFrameLevel) and (portraitParent:GetFrameLevel() + 1) or 0
-    badge:SetFrameStrata(st.host.top:GetFrameStrata())
-    badge:SetFrameLevel(math.max(floor, st.host.top:GetFrameLevel() - 1))
-    if st.host.top:GetFrameLevel() <= badge:GetFrameLevel() then st.host.top:SetFrameLevel(badge:GetFrameLevel() + 1) end
-  end
-  SyncLevel()
-  hooksecurefunc(st.host.top, "SetFrameLevel", SyncLevel)
-  hooksecurefunc(st.host.top, "SetFrameStrata", SyncLevel)
-  badge.SyncLevel = SyncLevel
+  badge.SyncLevel = function() FrameBase.SyncAdornmentLevels(st) end
+  hooksecurefunc(st.host.top, "SetFrameLevel", badge.SyncLevel)
+  hooksecurefunc(st.host.top, "SetFrameStrata", badge.SyncLevel)
+  -- Bars re-level under Blizzard/prediction control; the adornment must stay above them.
+  for _, bar in pairs(st.bars) do hooksecurefunc(bar.stock, "SetFrameLevel", badge.SyncLevel) end
   badge:ApplyColors()
   badge:Hide()
   st.portraitBadge = badge
   FrameBase.PlacePortraitBadge(st)
+  FrameBase.SyncAdornmentLevels(st)
   return badge
+end
+
+-- Chrome calls this with the frame it reparents the portrait into. The rim becomes a region of THAT frame so the two
+-- always share a frame level; draw layer ARTWORK/7 keeps the rim above the portrait texture (Blizzard puts portraits
+-- in BACKGROUND or BORDER) and below nothing else on that frame.
+function FrameBase.AttachPortraitRim(st, portraitLayer)
+  local rim = st.adornment and st.adornment.rim
+  if not rim or not portraitLayer then return end
+  rim:SetParent(portraitLayer)
+  rim:SetDrawLayer("ARTWORK", 7)
+  rim:Show()
+end
+
+-- THE level audit, in one place (owner, Era 2026-11-25: level badge above EVERYTHING incl. both glows):
+--   portrait's parent  <  bars  <  bar glow rings  <  adornment (rim + badge)  <  host.top (text)
+-- Re-run after anything that reparents or relevels the portrait (Chrome), the bars, the text host (predictions raise
+-- it) or on every appearance pass.
+function FrameBase.SyncAdornmentLevels(st)
+  local adornment, portrait = st.adornment, Client.Portrait(st.id)
+  if not adornment or not portrait or st.syncingAdornment then return end
+  st.syncingAdornment = true
+  local portraitParent = portrait:GetParent()
+  local floor = (portraitParent and portraitParent.GetFrameLevel) and (portraitParent:GetFrameLevel() + 1) or 0
+  -- Above every bar, its upper border ring and its combat glow ring (bar + borderOffset + 1).
+  for _, bar in pairs(st.bars) do
+    local stock = bar.stock
+    floor = math.max(floor, stock:GetFrameLevel() + (stock.vfsBorderLevelOffset or 1) + 2)
+  end
+  if st.chrome and st.chrome.glow then
+    for _, ring in pairs(st.chrome.glow.rings or {}) do floor = math.max(floor, ring:GetFrameLevel() + 1) end
+  end
+  adornment:SetFrameStrata(st.host.top:GetFrameStrata())
+  adornment:SetFrameLevel(math.max(floor, st.host.top:GetFrameLevel() - 1))
+  if st.portraitBadge then st.portraitBadge:SetFrameLevel(adornment:GetFrameLevel()) end
+  if st.host.top:GetFrameLevel() <= adornment:GetFrameLevel() then st.host.top:SetFrameLevel(adornment:GetFrameLevel() + 1) end
+  st.syncingAdornment = nil
 end
 
 -- Size + place from the CURRENT portrait size (Edit Mode zoom on Blizzard frames; Pet is 37, Player/Target 64).
@@ -273,6 +332,8 @@ end
 function FrameBase.PlacePortraitBadge(st)
   local badge, portrait = st.portraitBadge, Client.Portrait(st.id)
   if not badge or not portrait then return end
+  local rimSize = RimDrawSize(portrait)
+  st.adornment.rim:SetSize(rimSize, rimSize)
   local size, ring, along = BadgeMetrics(portrait)
   badge:SetSize(size, size)
   badge.ring:SetSize(size + 2 * ring, size + 2 * ring)

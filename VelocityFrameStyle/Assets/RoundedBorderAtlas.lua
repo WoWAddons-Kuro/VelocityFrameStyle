@@ -30,3 +30,9 @@ VFS.RoundedGlowAtlas = {
     bottomRight = { 0.640625, 0.921875, 0.640625, 0.921875 },
   },
 }
+VFS.RoundedShapes = {
+  disc = "Interface\\AddOns\\" .. ADDON_NAME .. "\\Assets\\disc.tga",
+  portraitRim = "Interface\\AddOns\\" .. ADDON_NAME .. "\\Assets\\portrait_rim.tga",
+  softDisc = "Interface\\AddOns\\" .. ADDON_NAME .. "\\Assets\\soft_disc.tga",
+  pixels = 128, discRadius = 62, rimInnerRadius = 54,
+}

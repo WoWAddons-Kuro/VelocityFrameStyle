@@ -10,9 +10,10 @@ local Util, Client, DB = VFS.Util, VFS.Client, VFS.DB
 local Chrome = {}
 VFS.Chrome = Chrome
 
-local A = "Interface\\AddOns\\" .. ADDON_NAME .. "\\Assets\\"
-local CIRCLE = "Interface\\CHARACTERFRAME\\TempPortraitAlphaMask"   -- feathered-edge disc (ships in the client)
-local SOFT_DISC = A .. "soft_disc.tga"
+-- Every disc here is a GENERATED white/alpha shape (Scripts\GenerateRoundedBorderAtlas.cs -> VFS.RoundedShapes), tinted
+-- at runtime. No Blizzard-owned art (TempPortraitAlphaMask) so colours are ours to change without new assets.
+local function CIRCLE() return VFS.RoundedShapes.disc end
+local function SOFT_DISC() return VFS.RoundedShapes.softDisc end
 
 -- Fixed M0 geometry per frame (EasyFrames-Forever constants; spec table). All relative to the unit button.
 -- health/power: { width, height }; platePad: plate padding beyond the bars; nameRow: height of the name row above health.
@@ -54,9 +55,9 @@ function Chrome.Create(st)
 
   -- Disc (BACKGROUND) and soft rim behind it
   local discSoft = holder:CreateTexture(nil, "BACKGROUND", nil, -8)
-  discSoft:SetTexture(SOFT_DISC)
+  discSoft:SetTexture(SOFT_DISC())
   local disc = holder:CreateTexture(nil, "BACKGROUND", nil, -7)
-  disc:SetTexture(CIRCLE)
+  disc:SetTexture(CIRCLE())
 
   -- Geometry only: each bar now owns its border and translucent surface.
   -- This envelope remains solely to anchor the outer combat outline.
@@ -70,7 +71,7 @@ function Chrome.Create(st)
   local glowFrame = CreateFrame("Frame", nil, holder)
   glowFrame:SetAllPoints(holder)
   glowFrame:SetFrameLevel(holder:GetFrameLevel() + 2)
-  local gDisc = glowFrame:CreateTexture(nil, "ARTWORK"); gDisc:SetTexture(SOFT_DISC); gDisc:SetBlendMode("ADD")
+  local gDisc = glowFrame:CreateTexture(nil, "ARTWORK"); gDisc:SetTexture(SOFT_DISC()); gDisc:SetBlendMode("ADD")
   glowFrame:SetAlpha(0)
   local anim = glowFrame:CreateAnimationGroup()
   anim:SetLooping("BOUNCE")
@@ -92,24 +93,55 @@ function Chrome.Create(st)
     rings[kind] = ring
   end
 
-  -- Texture draw layers cannot beat a higher FRAME level. In particular pet and
-  -- pet-target portraits belonged to the button itself, below our glow child.
-  -- Keep the original visibility parent and anchors, but give the portrait its
-  -- own layer above both glow shapes so only the exposed circular rim glows.
+  -- THE FRAME-LEVEL STACK (owner, Era 2026-11-25). Texture draw layers cannot beat a higher frame level, so order is
+  -- fixed with frame levels, lowest first:
+  --   holder (plate disc)  <  glowFrame (portrait rim glow)  <  portraitLayer (portrait)  <  BARS + their borders
+  --   <  bar glow rings  <  adornment (portrait rim + level badge)  <  host.top (text)
+  -- The portrait therefore tucks UNDER the health/power bars where they overlap it, and the level badge sits above
+  -- everything including both glows. Blizzard owns the bars' levels, so the portrait layer is pinned BELOW the lowest
+  -- bar (and above the glow), and FrameBase.SyncAdornmentLevels pins the adornment above the highest glow ring.
+  -- The portrait keeps its original visibility parent and anchors; only its drawing parent moves.
   if portrait then
     local originalParent = portrait:GetParent()
     local portraitLayer = CreateFrame("Frame", nil, originalParent)
     portraitLayer:SetAllPoints(originalParent)
     portraitLayer:EnableMouse(false)
+    st.portraitLayer = portraitLayer
+    local function LowestBarLevel()
+      local lowest
+      for _, bar in pairs(st.bars) do
+        local lvl = bar.stock:GetFrameLevel()
+        -- A bar's lower border (backdrop) sits at bar - 1; the portrait must be under THAT too.
+        if bar.stock.vfsBackdrop then lvl = math.min(lvl, bar.stock.vfsBackdrop:GetFrameLevel()) end
+        if not lowest or lvl < lowest then lowest = lvl end
+      end
+      return lowest
+    end
     local function SyncPortraitLayer()
       portraitLayer:SetFrameStrata(glowFrame:GetFrameStrata())
-      portraitLayer:SetFrameLevel(math.max(originalParent:GetFrameLevel() + 1, glowFrame:GetFrameLevel() + 1))
+      local above = math.max(originalParent:GetFrameLevel() + 1, glowFrame:GetFrameLevel() + 1)
+      local below = LowestBarLevel()
+      -- Prefer just under the bars; never drop below the glow (then the glow would cover the portrait).
+      portraitLayer:SetFrameLevel(below and math.max(above, below - 1) or above)
+      if below and portraitLayer:GetFrameLevel() >= below then
+        -- No room between glow and bars: push the bars' stack up by raising nothing of Blizzard's - instead sink
+        -- holder+glow one step so the portrait fits under the bars.
+        holder:SetFrameLevel(math.max(0, holder:GetFrameLevel() - 1))
+        glowFrame:SetFrameLevel(holder:GetFrameLevel() + 2)
+        portraitLayer:SetFrameLevel(math.max(glowFrame:GetFrameLevel() + 1, below - 1))
+      end
+      -- Everything painted over the portrait (rim, level badge) must follow it up: one audited sync in FrameBase.
+      VFS.FrameBase.SyncAdornmentLevels(st)
     end
     SyncPortraitLayer()
     portrait:SetParent(portraitLayer)
+    -- The black rim rides the same layer as the portrait so it tucks under the bars with it.
+    VFS.FrameBase.AttachPortraitRim(st, portraitLayer)
+    VFS.FrameBase.SyncAdornmentLevels(st)
     hooksecurefunc(glowFrame, "SetFrameLevel", SyncPortraitLayer)
     hooksecurefunc(glowFrame, "SetFrameStrata", SyncPortraitLayer)
     hooksecurefunc(originalParent, "SetFrameLevel", SyncPortraitLayer)
+    for _, bar in pairs(st.bars) do hooksecurefunc(bar.stock, "SetFrameLevel", SyncPortraitLayer) end
   end
 
   st.chrome = { holder = holder, disc = disc, discSoft = discSoft, plate = plate,

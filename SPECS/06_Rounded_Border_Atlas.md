@@ -16,6 +16,10 @@ Outputs:
 - `VelocityFrameStyle/Assets/rounded_border_atlas.tga`: shipped 128×128, uncompressed 32-bit BGRA TGA, top-left origin, white RGB with shape in alpha.
 - `VelocityFrameStyle/Assets/RoundedBorderAtlas.lua`: generated runtime geometry and UV metadata; loaded before the renderer.
 - `Assets/rounded_border_atlas.json`: unshipped slice rectangles and normalized UVs.
+- `VelocityFrameStyle/Assets/disc.tga`, `portrait_rim.tga`, `soft_disc.tga` (2026-11-25): 128×128 white/alpha round shapes, listed in
+  `VFS.RoundedShapes`. **Every disc the addon draws is generated and tinted at runtime** — portrait plate, soft halo, combat rim glow,
+  level badge, and the portrait rim (an annulus 54→62 px painted OVER the portrait edge; it clips square class-icon portraits and gives every
+  portrait the bar-border edge). No dependency on Blizzard's `TempPortraitAlphaMask`. White-with-alpha art tints to any colour, black included.
 - `Assets/rounded_border_preview.tga`: unshipped 4× composite preview reconstructed from the atlas.
 - `Assets/rounded_border_preview.png`: inspection copy converted from the TGA using Pillow; not required at runtime.
 
