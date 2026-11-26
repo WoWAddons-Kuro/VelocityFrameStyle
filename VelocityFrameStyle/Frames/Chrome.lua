@@ -123,18 +123,29 @@ function Chrome.Create(st)
     end
     -- The portrait group needs 3 levels under the lowest bar backdrop: holder, portraitLayer, glowFrame.
     local GROUP = 3
+    local syncing = false
     local function SyncPortraitLayer()
+      -- Re-entrancy: EnsureBarHeadroom lifts the bars one by one and each SetFrameLevel fires this hook again while
+      -- the others are still at the old level, so a mid-lift read gave ceiling 0..2 and ceiling-3 went negative ->
+      -- SetFrameLevel threw -> Target.Create aborted with no slots (owner, Era 2026-11-25). One pass at a time.
+      if syncing then return end
+      syncing = true
       local ceiling = LowestBarBackdropLevel() or (hb:GetFrameLevel())
       if ceiling < GROUP then
         VFS.FrameBase.EnsureBarHeadroom(st, GROUP - ceiling)
         ceiling = LowestBarBackdropLevel() or hb:GetFrameLevel()
       end
+      -- Frame levels are unsigned. If a client leaves us no room even after the lift (headroom already applied for a
+      -- different reason, or a bar parented where it cannot move) clamp at 0 rather than throw: a flat stack is a
+      -- cosmetic fault, an aborted Create loses the whole frame.
+      local base = math.max(0, ceiling - GROUP)
       local strata = hb:GetFrameStrata()
-      holder:SetFrameStrata(strata);        holder:SetFrameLevel(ceiling - 3)
-      portraitLayer:SetFrameStrata(strata); portraitLayer:SetFrameLevel(ceiling - 2)
-      glowFrame:SetFrameStrata(strata);     glowFrame:SetFrameLevel(ceiling - 1)
+      holder:SetFrameStrata(strata);        holder:SetFrameLevel(base)
+      portraitLayer:SetFrameStrata(strata); portraitLayer:SetFrameLevel(base + 1)
+      glowFrame:SetFrameStrata(strata);     glowFrame:SetFrameLevel(base + 2)
       -- Everything painted over the portrait (rim, level badge) must follow it up: one audited sync in FrameBase.
       VFS.FrameBase.SyncAdornmentLevels(st)
+      syncing = false
     end
     SyncPortraitLayer()
     portrait:SetParent(portraitLayer)

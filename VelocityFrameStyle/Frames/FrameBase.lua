@@ -312,7 +312,10 @@ end
 function FrameBase.EnsureBarHeadroom(st, by)
   if not by or by <= 0 or st.barHeadroomApplied then return end
   st.barHeadroomApplied = by
-  for _, bar in pairs(st.bars) do bar.stock:SetFrameLevel(bar.stock:GetFrameLevel() + by) end
+  -- Lift from the pre-read levels so a hook that re-levels a sibling mid-loop cannot double-count.
+  local targets = {}
+  for _, bar in pairs(st.bars) do targets[bar.stock] = bar.stock:GetFrameLevel() + by end
+  for stock, level in pairs(targets) do stock:SetFrameLevel(level) end
   -- The lift ran inside a sync that holds the reentrancy guard; re-run the audit explicitly once it is released.
   st.syncingAdornment = nil
   FrameBase.SyncAdornmentLevels(st)
