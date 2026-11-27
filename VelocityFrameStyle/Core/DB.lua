@@ -45,6 +45,11 @@ DB.DEFAULT_GLOBAL = {
   -- pet-target extras
   petTargetHealthOnly = true,
   petTargetFlashOnNew = true,
+  -- target-of-target extras (spec 11; owner 2026-11-26)
+  totEnabled = true,              -- master: any ToT frame at all (ours or Blizzard's; also drives CVar showTargetOfTarget)
+  totHealthOnly = true,
+  totFlashOnNew = true,
+  totHideWhenMe = false,          -- soft-hide (alpha 0) when the target's target is the player; GUID compare
   -- Era hunter pets: hover panel on the happiness icon / pet level badge (SPECS/10)
   petHappinessPanel = true,
   petHappinessPanelShiftOnly = false,   -- show the panel only while Shift is held
@@ -64,7 +69,10 @@ DB.FRAME_IDS = { "player", "target", "pet", "pettarget", "tot" }   -- every fram
 -- VFS_Placement for the pet-target frame (anchorTo = "PetFrame" is the un-moved default; LibEditMode clears it)
 DB.DEFAULT_PLACEMENT = { anchorTo = "PetFrame", point = "LEFT", relPoint = "RIGHT", x = 8, y = 0 }
 DB.FALLBACK_PLACEMENT = { point = "CENTER", x = 220, y = -40 }
-DB.DEFAULT_PROFILE = { petTargetPlacement = DB.DEFAULT_PLACEMENT }   -- VFS_ProfileRecord
+-- VFS_Placement for our Target-of-Target frame (spec 11): where Blizzard's own ToT sits - its BOTTOMRIGHT at TargetFrame's
+-- BOTTOMRIGHT (-16, -14) on Era's TargetofTargetFrameTemplate. The same anchor is used on Forever for v1 (owner: tune in test).
+DB.DEFAULT_TOT_PLACEMENT = { anchorTo = "TargetFrame", point = "BOTTOMRIGHT", relPoint = "BOTTOMRIGHT", x = -16, y = -14 }
+DB.DEFAULT_PROFILE = { petTargetPlacement = DB.DEFAULT_PLACEMENT, totPlacement = DB.DEFAULT_TOT_PLACEMENT }   -- VFS_ProfileRecord
 
 function DB.Init()
   VelocityFrameStyleDB = type(VelocityFrameStyleDB) == "table" and VelocityFrameStyleDB or {}
@@ -174,6 +182,9 @@ function DB.Profile()
   -- Deep-filling it restored PetFrame after every drag, immediately undoing the move.
   if type(p.petTargetPlacement) ~= "table" then
     p.petTargetPlacement = Util.DeepCopy(DB.DEFAULT_PLACEMENT)
+  end
+  if type(p.totPlacement) ~= "table" then
+    p.totPlacement = Util.DeepCopy(DB.DEFAULT_TOT_PLACEMENT)
   end
   return p
 end

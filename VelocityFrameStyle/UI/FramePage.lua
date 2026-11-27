@@ -85,8 +85,35 @@ end
 -- The section ----------------------------------------------------------------------------------------------
 function FramePage.BuildFrameSection(content, id)
   local box = Widgets.Section(content, LABELS[id] or id)
-  box:Add(Widgets.Check(box, "Enabled", "Restyle this frame.", function() return DB.Frame(id).enabled end,
-    function(v) DB.Frame(id).enabled = v; Restyle(id) end), 26)
+  if id == "tot" then
+    -- Master switch for a target-of-target frame AT ALL (owner 2026-11-26): Blizzard's CVar showTargetOfTarget
+    -- (Interface > Combat) AND whether our owned frame runs. Off = neither frame. On = ours when "Use Velocity Frame
+    -- Style" is ticked below, Blizzard's otherwise.
+    box:Add(Widgets.Check(box, "Enable target of target frame",
+      "Show a target-of-target frame at all. Also sets the game's own 'Target of Target' option (Interface > Combat).",
+      function() return DB.Global().totEnabled ~= false end,
+      function(v)
+        DB.Global().totEnabled = v
+        SetCVar("showTargetOfTarget", v and "1" or "0")
+        -- Forever's TargetOfTargetMixin caches the CVar in self.showTargetOfTarget and arms/disarms its OnUpdate only
+        -- from OnTargetOfTargetCVarChanged; an addon SetCVar did not re-arm it (owner 2026-11-26: CVar "1", frame never
+        -- shown). Call Blizzard's own refresh when it exists; Era's mixin reads the CVar directly every Update.
+        if TargetFrameToT and TargetFrameToT.OnTargetOfTargetCVarChanged then TargetFrameToT:OnTargetOfTargetCVarChanged()
+        elseif TargetFrameToT and TargetFrameToT.Update then TargetFrameToT:Update() end
+        if FocusFrameToT and FocusFrameToT.OnTargetOfTargetCVarChanged then FocusFrameToT:OnTargetOfTargetCVarChanged() end
+        if VFS.ToT and VFS.ToT.SetEnabled then VFS.ToT.SetEnabled(v) end
+        Widgets.RefreshAll()
+      end), 26)
+  end
+  box:Add(Widgets.Check(box, "Use Velocity Frame Style",
+    "Restyle this frame. Turning this off takes effect after the interface reloads (a Reload button appears at the bottom of the page).",
+    function() return DB.Frame(id).enabled end,
+    function(v)
+      local wasStyled = VFS.Frames[id] ~= nil
+      DB.Frame(id).enabled = v
+      Restyle(id)
+      if not v and wasStyled and VFS.Options and VFS.Options.RequestReload then VFS.Options.RequestReload() end
+    end), 26)
   box:Add(Widgets.Text(box, "Bar dimensions only; text, portrait and borders do not zoom. Changes made in combat apply afterward."), 28)
   for _, definition in ipairs(DB.DIMENSION_CONTROLS) do
     local key = definition.key
@@ -132,6 +159,17 @@ function FramePage.BuildFrameSection(content, id)
     box:Add(Widgets.Button(box, "Copy text layout from Target", function()
       DB.Frame("pettarget").elements = Util.DeepCopy(DB.Elements("target")); Restyle("pettarget"); Widgets.RefreshAll()
     end, 220), 22, -8)
+  end
+  if id == "tot" then
+    box:Add(Widgets.Check(box, "Only show health bar",
+      "Hide the target-of-target power bar and its text, background and border, including in Edit Mode.",
+      function() return DB.Global().totHealthOnly end, function(v) DB.Global().totHealthOnly = v; Restyle(id) end), 26, -8)
+    box:Add(Widgets.Check(box, "Flash when the target picks a new target", nil,
+      function() return DB.Global().totFlashOnNew end, function(v) DB.Global().totFlashOnNew = v end), 26)
+    box:Add(Widgets.Check(box, "Hide when the target is targeting you",
+      "Fades the frame out while your target's target is you (the frame still exists; it only turns invisible).",
+      function() return DB.Global().totHideWhenMe == true end, function(v) DB.Global().totHideWhenMe = v; if VFS.ToT.Update then VFS.ToT.Update() end end), 26)
+    box:Add(Widgets.Text(box, "Move it in Edit Mode (" .. Client.EditModeHint() .. ")"), 28)
   end
 
   box:Add(Widgets.Button(box, "Reset " .. (LABELS[id] or id), function() DB.ResetFrame(id); Restyle(id); Widgets.RefreshAll() end, 160), 22, -10)

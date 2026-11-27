@@ -380,14 +380,16 @@ end
 -- Target follows its native controller; our pet-target uses the client's explicit
 -- resource-presence query. Never run native Lua comparisons on secret capacity.
 function FrameBase.RefreshPowerVisibility(st)
-  if st.id ~= "target" and st.id ~= "pettarget" then return false end
+  local owned = VFS.OwnedUnitFrame and VFS.OwnedUnitFrame.Get(st.id)
+  if st.id ~= "target" and not owned then return false end
   local power = st.bars.power
   if not power then return false end
   local absent = false
   if DB.Frame(st.id).enabled then
-    if st.id == "pettarget" then
-      absent = DB.Global().petTargetHealthOnly
-        or (not VFS.PetTarget.IsSample() and Client.HasPowerResource(st.unit) == false)
+    if owned then
+      local key = owned.spec.healthOnlyGlobalKey
+      absent = (key and DB.Global()[key])
+        or (not owned.sample and Client.HasPowerResource(st.unit) == false)
     else
       -- IsShown is local to the bar: hiding the whole target frame is not
       -- evidence of no resource. Do not use IsVisible here.
@@ -527,6 +529,8 @@ end
 function FrameBase.ApplyAppearance(st)
   local id = st.id
   local enabled = DB.Frame(id).enabled
+  -- "Use Velocity Frame Style" OFF is honoured at LOAD: a disabled frame is never acquired/hooked (bootstrap), and the
+  -- options page asks for a /reload. Undoing hooks, reparented portraits and stripped masks in place is not attempted.
   if enabled then VFS.Geometry.ApplyBarDimensions(st) end
   local backing = DB.Effective(id, "backingAlpha")
   for kind, bar in pairs(st.bars) do
@@ -618,8 +622,9 @@ end
 function FrameBase.Restyle(id)
   local st = VFS.Frames[id]
   if not st then return end
-  if id == "pettarget" and VFS.PetTarget.IsSample() then
-    VFS.PetTarget.SetSample(true)
+  local owned = VFS.OwnedUnitFrame and VFS.OwnedUnitFrame.Get(id)
+  if owned and owned.sample then
+    VFS.OwnedUnitFrame.SetSample(owned, true)
     return
   end
   FrameBase.ApplyAppearance(st)

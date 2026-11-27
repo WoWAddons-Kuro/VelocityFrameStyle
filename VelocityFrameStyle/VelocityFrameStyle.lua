@@ -40,7 +40,7 @@ local function Status()
       #Client.ChromeRegions(id), #Client.KeepRegions(id), Client.NameText(id) and "ok" or "MISSING")
   end
   Util.Print(VFS.EditMode.Status())
-  Util.Print(VFS.PetTargetVisibility.Status())
+  Util.Print(VFS.OwnedVisibility.Status())
   if VFS.PetHappinessPanel and VFS.features["PetHappinessPanel"] then Util.Print(VFS.PetHappinessPanel.Status()) end
   local feats = {}
   for k, v in pairs(VFS.features) do feats[#feats + 1] = k .. "=" .. tostring(v) end
@@ -360,21 +360,32 @@ local function OnEvent(_, event, arg1, arg2)
     if VFS.standDown then
       Util.Print("standing down: %s owns the unit frames. Nothing is restyled.", VFS.standDown)
     else
-      Stage("Player", VFS.Player.Create)
-      Stage("Target", VFS.Target.Create)
-      Stage("Pet", VFS.Pet.Create)
-      Stage("ToT", VFS.ToT.Create)
+      -- "Use Velocity Frame Style" OFF is honoured HERE, at load: the frame is never acquired or hooked, so Blizzard's
+      -- frame is untouched. Unticking it live only asks for a /reload (UI\Options.lua banner); nothing is undone in place.
+      local function Styled(id) return DB.Frame(id).enabled end
+      if Styled("player") then Stage("Player", VFS.Player.Create) end
+      if Styled("target") then Stage("Target", VFS.Target.Create) end
+      if Styled("pet") then Stage("Pet", VFS.Pet.Create) end
+      -- Owned Target-of-Target (spec 11), after Target so Blizzard's ToT is already suppressed as Target chrome.
+      if Styled("tot") then
+        Stage("ToT", VFS.ToT.Create)
+        Stage("ToTVisibility", function() VFS.OwnedVisibility.Register(VFS.ToT.owned) end)
+        Stage("ToTPlacement", function() if not VFS.ToT.ApplyPlacement() then VFS.OwnedVisibility.MarkPending("tot") end end)
+      end
       -- Era hunter pets only; Setup is a no-op where Client.PetHappinessFrame() is nil (Forever).
       Stage("PetHappinessPanel", VFS.PetHappinessPanel.Setup)
     end
-    if VFS.standDownPetTarget then
+    if VFS.standDownPetTarget or not DB.Frame("pettarget").enabled then
       Util.Print("pet-target frame off: %s already provides one.", VFS.standDownPetTarget)
     else
       Stage("PetTarget", VFS.PetTarget.Create)
+      Stage("PetTargetVisibility", function() VFS.OwnedVisibility.Register(VFS.PetTarget.owned) end)
       Stage("PetTargetPlacement", function() if not VFS.PetTarget.ApplyPlacement() then VFS.PetTargetVisibility.MarkPending() end end)
-      Stage("EditMode", VFS.EditMode.Setup)
-      Stage("PetTargetVisibility", VFS.PetTargetVisibility.EnableDriver)
     end
+    -- Edit Mode is needed by every owned frame (ToT too), not only Pet Target
+    Stage("EditMode", VFS.EditMode.Setup)
+    if VFS.PetTarget.frame then Stage("PetTargetDriver", VFS.PetTargetVisibility.EnableDriver) end
+    if VFS.ToT.frame and VFS.ToT.IsEnabled() then Stage("ToTDriver", function() VFS.OwnedVisibility.EnableDriver("tot") end) end
     Stage("Options", VFS.Options.Create)
     f:RegisterEvent("PLAYER_REGEN_ENABLED")
     f:RegisterEvent("PLAYER_REGEN_DISABLED")
@@ -384,39 +395,52 @@ local function OnEvent(_, event, arg1, arg2)
     f:RegisterEvent("RAID_TARGET_UPDATE")
     f:RegisterEvent("ADDON_ACTION_BLOCKED")
     f:RegisterEvent("ADDON_ACTION_FORBIDDEN")
-    f:RegisterUnitEvent("UNIT_TARGET", "pet")
+    f:RegisterUnitEvent("UNIT_TARGET", "pet", "target")
     f:RegisterUnitEvent("UNIT_PET", "player")
-    f:RegisterUnitEvent("UNIT_LEVEL", "player", "target", "pet", "pettarget")
-    f:RegisterUnitEvent("UNIT_NAME_UPDATE", "player", "target", "pet", "pettarget")
-    f:RegisterUnitEvent("UNIT_FACTION", "target", "pettarget")
-    f:RegisterUnitEvent("UNIT_FLAGS", "player", "target", "pet", "pettarget")   -- in-combat flag -> our glow
-    f:RegisterUnitEvent("UNIT_CLASSIFICATION_CHANGED", "target", "pettarget")
+    f:RegisterUnitEvent("UNIT_LEVEL", "player", "target", "pet", "pettarget", "targettarget")
+    f:RegisterUnitEvent("UNIT_NAME_UPDATE", "player", "target", "pet", "pettarget", "targettarget")
+    f:RegisterUnitEvent("UNIT_FACTION", "target", "pettarget", "targettarget")
+    f:RegisterUnitEvent("UNIT_FLAGS", "player", "target", "pet", "pettarget", "targettarget")   -- in-combat flag -> our glow
+    f:RegisterUnitEvent("UNIT_CLASSIFICATION_CHANGED", "target", "pettarget", "targettarget")
+    -- owned ToT value events (pettarget fires none and polls instead)
+    f:RegisterUnitEvent("UNIT_HEALTH", "targettarget")
+    f:RegisterUnitEvent("UNIT_MAXHEALTH", "targettarget")
+    f:RegisterUnitEvent("UNIT_POWER_UPDATE", "targettarget")
+    f:RegisterUnitEvent("UNIT_MAXPOWER", "targettarget")
+    f:RegisterUnitEvent("UNIT_DISPLAYPOWER", "targettarget")
     Util.Print("loaded (%s). /vfs for options, /vfs status for details", Client.flavour)
   elseif event == "ADDON_ACTION_BLOCKED" or event == "ADDON_ACTION_FORBIDDEN" then
     if arg1 == ADDON_NAME then
       Util.WarnOnce("blocked:" .. tostring(arg2), "the game blocked " .. tostring(arg2) .. " (in combat)")
     end
   elseif event == "PLAYER_REGEN_ENABLED" then
-    VFS.PetTargetVisibility.OnRegenEnabled()
+    VFS.OwnedVisibility.OnRegenEnabled()
     for id, st in pairs(VFS.Frames) do
       if st.dimensionsPending then VFS.FrameBase.Restyle(id) end
     end
     -- our combat glow follows the player's combat state on every frame we style
     for _, st in pairs(VFS.Frames) do VFS.FrameBase.OnCombatChanged(st) end
+    if VFS.ToT.frame then VFS.ToT.OnEvent(event) end
   elseif event == "PLAYER_REGEN_DISABLED" then
     for _, st in pairs(VFS.Frames) do VFS.FrameBase.OnCombatChanged(st) end
   elseif event == "UNIT_TARGET" then
-    if VFS.PetTarget.frame then VFS.PetTarget.OnPetTargetChanged() end
+    if arg1 == "pet" and VFS.PetTarget.frame then VFS.PetTarget.OnPetTargetChanged() end
+    if arg1 == "target" and VFS.ToT.frame then VFS.ToT.OnEvent(event, arg1) end
   elseif event == "UNIT_PET" then
     if VFS.PetTarget.frame then VFS.PetTarget.OnPetTargetChanged() end
     if VFS.Frames.pet then VFS.Pet.OnEvent(event, arg1) end
   elseif event == "PLAYER_TARGET_CHANGED" then
     if VFS.Frames.target then VFS.Target.OnEvent(event) end
+    if VFS.ToT.frame then VFS.ToT.OnEvent(event) end
+  elseif event == "UNIT_HEALTH" or event == "UNIT_MAXHEALTH" or event == "UNIT_POWER_UPDATE" or event == "UNIT_MAXPOWER" or event == "UNIT_DISPLAYPOWER" then
+    -- registered for targettarget only: the owned ToT has no poller (pettarget does, it fires no events)
+    if VFS.ToT.frame then VFS.ToT.OnEvent(event, arg1) end
   else
     if VFS.Frames.player then VFS.Player.OnEvent(event, arg1) end
     if VFS.Frames.target then VFS.Target.OnEvent(event, arg1) end
     if VFS.Frames.pet then VFS.Pet.OnEvent(event, arg1) end
     if VFS.PetTarget.frame and (arg1 == "pettarget" or event == "PLAYER_ENTERING_WORLD" or event == "RAID_TARGET_UPDATE") then VFS.PetTarget.Update() end
+    if VFS.ToT.frame and (arg1 == "targettarget" or event == "PLAYER_ENTERING_WORLD" or event == "RAID_TARGET_UPDATE") then VFS.ToT.OnEvent(event, arg1) end
   end
 end
 

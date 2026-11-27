@@ -7,12 +7,18 @@ local P = Client.Path
 
 local UNITS = { player = "player", target = "target", pet = "pet", pettarget = "pettarget", tot = "targettarget" }
 
+-- pettarget and tot are OUR frames (Frames\OwnedUnitFrame.lua, spec 11); every region resolver returns their regions.
+local function Owned(id)
+  local o = VFS.OwnedUnitFrame and VFS.OwnedUnitFrame.Get(id)
+  return o and o.frame
+end
+local function IsOwned(id) return id == "pettarget" or id == "tot" end
+
 local function Root(id)
   if id == "player" then return PlayerFrame
   elseif id == "target" then return TargetFrame
   elseif id == "pet" then return PetFrame
-  elseif id == "tot" then return TargetFrameToT
-  elseif id == "pettarget" then return VFS.PetTarget and VFS.PetTarget.frame end
+  elseif IsOwned(id) then return Owned(id) end
 end
 
 -- Mainline containers
@@ -65,18 +71,17 @@ VFS.ClientFlavours.forever = {
     if id == "player" then return P(PlayerMain(), "HealthBarsContainer.HealthBar")
     elseif id == "target" then return P(TargetMain(), "HealthBarsContainer.HealthBar")
     elseif id == "pet" then return PetFrameHealthBar
-    elseif id == "tot" then return TargetFrameToT and TargetFrameToT.HealthBar
-    elseif id == "pettarget" then local f = Root(id); return f and f.health end
+    elseif IsOwned(id) then local f = Root(id); return f and f.health end
   end,
   PowerBar = function(id)
     if id == "player" then return P(PlayerMain(), "ManaBarArea.ManaBar")
     elseif id == "target" then return P(TargetMain(), "ManaBar")
     elseif id == "pet" then return PetFrameManaBar
-    elseif id == "tot" then return TargetFrameToT and TargetFrameToT.ManaBar
-    elseif id == "pettarget" then local f = Root(id); return f and f.power end
+    elseif IsOwned(id) then local f = Root(id); return f and f.power end
   end,
   -- Geometric chrome (spec): every Blizzard art region we alpha-zero. The frame texture, flashes, status glow, level
   -- circle, reaction strip, the health container's black Background and the loss bars. Masks are not regions we touch.
+  -- Blizzard's own ToT (replaced by our owned frame, spec 11) is suppressed as Target chrome: never Hide() it.
   ChromeRegions = function(id)
     if id == "player" then
       local c, m = P(PlayerFrame, "PlayerFrameContainer"), PlayerMain()
@@ -89,14 +94,18 @@ VFS.ClientFlavours.forever = {
     elseif id == "target" then
       local c, m = P(TargetFrame, "TargetFrameContainer"), TargetMain()
       local hc = P(m, "HealthBarsContainer")
-      return List(c and c.FrameTexture, c and c.Flash, c and c.BossPortraitFrameTexture,
+      local out = List(c and c.FrameTexture, c and c.Flash, c and c.BossPortraitFrameTexture,
         m and m.ReputationColor, m and m.LevelBackgroundCircle,
         hc and hc.Background, hc and hc.HealthBar and hc.HealthBar.Background, hc and hc.TempMaxHealthLoss)
+      -- Blizzard's ToT is only chrome while OUR ToT replaces it; with "Use Velocity Frame Style" off for tot, it must draw.
+      local t = TargetFrameToT
+      if t and VFS.DB.Frame("tot").enabled then
+        for _, r in ipairs(List(t.FrameTexture, t.Portrait, t.Name, t.DeadText, t.HealthBar, t.ManaBar, t.Debuff1, t.Debuff2, t.Debuff3, t.Debuff4)) do out[#out + 1] = r end
+      end
+      return out
     elseif id == "pet" then
       return List(PetFrameTexture, PetFrameFlash, PetAttackModeTexture)
-    elseif id == "tot" then
-      local t = TargetFrameToT; return List(t and t.FrameTexture)
-    elseif id == "pettarget" then
+    elseif IsOwned(id) then
       local f = Root(id); return List(f and f.texture, f and f.nameBackground)
     end
     return {}
@@ -116,7 +125,7 @@ VFS.ClientFlavours.forever = {
   end,
   ClassificationIcon = function(id)
     if id == "target" then return P(TargetContextual(), "HighLevelTexture") end
-    if id == "pettarget" then local f = Root(id); return f and f.skull end
+    if IsOwned(id) then local f = Root(id); return f and f.skull end
   end,
   -- Forever (Camelot) keeps hunter-pet happiness and loyalty (owner screenshot 2026-11-26: "Happy - 125% damage -
   -- Gaining Loyalty" on the pet frame). Mainline_PetFrame.xml has no happiness region; Camelot injects it in code we
@@ -142,48 +151,44 @@ VFS.ClientFlavours.forever = {
     if id == "player" then return P(PlayerFrame, "PlayerFrameContainer.PlayerPortrait")
     elseif id == "target" then return P(TargetFrame, "TargetFrameContainer.Portrait")
     elseif id == "pet" then return PetPortrait
-    elseif id == "tot" then return TargetFrameToT and TargetFrameToT.Portrait
-    elseif id == "pettarget" then local f = Root(id); return f and f.portrait end
+    elseif IsOwned(id) then local f = Root(id); return f and f.portrait end
   end,
   NameText = function(id)
     if id == "player" then return PlayerName
     elseif id == "target" then return P(TargetMain(), "Name")
     elseif id == "pet" then return PetName
-    elseif id == "tot" then return TargetFrameToT and TargetFrameToT.Name
-    elseif id == "pettarget" then local f = Root(id); return f and f.name end
+    elseif IsOwned(id) then local f = Root(id); return f and f.name end
   end,
   HealthTexts = function(id)
     if id == "player" then local c = P(PlayerMain(), "HealthBarsContainer"); return List(c and c.HealthBarText, c and c.LeftText, c and c.RightText)
     elseif id == "target" then local c = P(TargetMain(), "HealthBarsContainer"); return List(c and c.HealthBarText, c and c.LeftText, c and c.RightText, c and c.DeadText)
     elseif id == "pet" then return List(PetFrameHealthBarText, PetFrameHealthBarTextLeft, PetFrameHealthBarTextRight)
-    elseif id == "tot" then local t = TargetFrameToT; return List(t and t.DeadText, t and t.HealthBar and t.HealthBar.TextString)
-    elseif id == "pettarget" then local f = Root(id); return List(f and f.healthText, f and f.deadText) end
+    elseif IsOwned(id) then local f = Root(id); return List(f and f.healthText, f and f.deadText) end
     return {}
   end,
   PowerTexts = function(id)
     if id == "player" then local m = P(PlayerMain(), "ManaBarArea.ManaBar"); return List(m and m.ManaBarText, m and m.LeftText, m and m.RightText)
     elseif id == "target" then local m = P(TargetMain(), "ManaBar"); return List(m and m.ManaBarText, m and m.LeftText, m and m.RightText)
     elseif id == "pet" then return List(PetFrameManaBarText, PetFrameManaBarTextLeft, PetFrameManaBarTextRight)
-    elseif id == "tot" then local t = TargetFrameToT; return List(t and t.ManaBar and t.ManaBar.TextString)
-    elseif id == "pettarget" then local f = Root(id); return List(f and f.powerText) end
+    elseif IsOwned(id) then local f = Root(id); return List(f and f.powerText) end
     return {}
   end,
   StockLevelRegions = function(id)
     if id == "player" then return List(PlayerLevelText)
     elseif id == "target" then return List(P(TargetMain(), "LevelText"), P(TargetMain(), "LevelBackgroundCircle"))
-    elseif id == "pettarget" then local f = Root(id); return List(f and f.level) end
+    elseif IsOwned(id) then local f = Root(id); return List(f and f.level) end
     return {}   -- pet: Blizzard has no level region
   end,
   NameBackground = function(id)
     if id == "target" then return P(TargetMain(), "ReputationColor")
-    elseif id == "pettarget" then local f = Root(id); return f and f.nameBackground end
+    elseif IsOwned(id) then local f = Root(id); return f and f.nameBackground end
   end,
   -- Geometric chrome (spec): the stock bars are ours to size and anchor on Forever too. SetHeight/SetPoint on the
   -- bar frames is unprotected (EasyFrames-Forever does exactly this); only MEASURING a few restricted regions is not.
-  -- pettarget bars are ours already and are placed by Frames\PetTarget.lua.
+  -- Owned-frame bars (pettarget, tot) are ours already and are placed by Frames\OwnedUnitFrame.lua.
   MovableBars = function(id)
     local out = {}
-    if id ~= "pettarget" then
+    if not IsOwned(id) then
       local h, p = VFS.Client.HealthBar(id), VFS.Client.PowerBar(id)
       if h then out[h] = true end
       if p then out[p] = true end
@@ -196,7 +201,7 @@ VFS.ClientFlavours.forever = {
     if id == "player" then return kind == "health" and P(PlayerMain(), "HealthBarsContainer.HealthBarText") or P(PlayerMain(), "ManaBarArea.ManaBar.ManaBarText") end
     if id == "target" then return kind == "health" and P(TargetMain(), "HealthBarsContainer.HealthBarText") or P(TargetMain(), "ManaBar.ManaBarText") end
     if id == "pet" then return kind == "health" and PetFrameHealthBarText or PetFrameManaBarText end
-    return nil   -- pettarget: our own frame, values are ours
+    return nil   -- owned frames (pettarget, tot): values are ours
   end,
   HasPowerResource = function(unit)
     local powerType = Util.PlainNumber(UnitPowerType(unit), nil)

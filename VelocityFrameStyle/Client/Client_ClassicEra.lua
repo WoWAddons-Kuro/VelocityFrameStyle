@@ -5,13 +5,20 @@ local ADDON_NAME, VFS = ...
 local Client, Util = VFS.Client, VFS.Util
 local P = Client.Path
 
-local UNITS = { player = "player", target = "target", pet = "pet", pettarget = "pettarget" }
+local UNITS = { player = "player", target = "target", pet = "pet", pettarget = "pettarget", tot = "targettarget" }
+
+-- pettarget and tot are OUR frames (Frames\OwnedUnitFrame.lua); every region resolver returns their regions.
+local function Owned(id)
+  local o = VFS.OwnedUnitFrame and VFS.OwnedUnitFrame.Get(id)
+  return o and o.frame
+end
+local function IsOwned(id) return id == "pettarget" or id == "tot" end
 
 local function Root(id)
   if id == "player" then return PlayerFrame
   elseif id == "target" then return TargetFrame
   elseif id == "pet" then return PetFrame
-  elseif id == "pettarget" then return VFS.PetTarget and VFS.PetTarget.frame end
+  elseif IsOwned(id) then return Owned(id) end
 end
 
 local function List(...)
@@ -37,20 +44,30 @@ VFS.ClientFlavours.classic_era = {
     if id == "player" then return PlayerFrameHealthBar
     elseif id == "target" then return TargetFrameHealthBar
     elseif id == "pet" then return PetFrameHealthBar
-    elseif id == "pettarget" then local f = Root(id); return f and f.health end
+    elseif IsOwned(id) then local f = Root(id); return f and f.health end
   end,
   PowerBar = function(id)
     if id == "player" then return PlayerFrameManaBar
     elseif id == "target" then return TargetFrameManaBar
     elseif id == "pet" then return PetFrameManaBar
-    elseif id == "pettarget" then local f = Root(id); return f and f.power end
+    elseif IsOwned(id) then local f = Root(id); return f and f.power end
   end,
-  -- Geometric chrome: everything Blizzard draws as frame art, alpha-zeroed. Era flat names.
+  -- Geometric chrome: everything Blizzard draws as frame art, alpha-zeroed. Era flat names. Blizzard's own ToT (a child
+  -- of TargetFrame we replace with our owned frame, spec 11) is suppressed as Target chrome: never Hide() it (protected
+  -- and re-shown by TargetOfTargetMixin:Update); its StatusBars/debuff frames are alpha-zeroed by SetChromeSuppressed.
   ChromeRegions = function(id)
     if id == "player" then return List(PlayerFrameTexture, PlayerFrameFlash, PlayerStatusTexture, PlayerFrameBackground)
-    elseif id == "target" then return List(TargetFrameTextureFrameTexture, TargetFrameFlash, TargetFrameNameBackground, TargetFrameBackground)
+    elseif id == "target" then
+      local out = List(TargetFrameTextureFrameTexture, TargetFrameFlash, TargetFrameNameBackground, TargetFrameBackground)
+      -- Blizzard's ToT is only chrome while OUR ToT replaces it; with "Use Velocity Frame Style" off for tot, it must draw.
+      if VFS.DB.Frame("tot").enabled then
+        for _, r in ipairs(List(TargetFrameToTTextureFrameTexture, TargetFrameToTBackground, TargetFrameToTPortrait, TargetFrameToTHealthBar,
+          TargetFrameToTManaBar, TargetFrameToTTextureFrameName, TargetFrameToTTextureFrameDeadText, TargetFrameToTTextureFrameUnconsciousText,
+          TargetFrameToTDebuff1, TargetFrameToTDebuff2, TargetFrameToTDebuff3, TargetFrameToTDebuff4)) do out[#out + 1] = r end
+      end
+      return out
     elseif id == "pet" then return List(PetFrameTexture, PetFrameFlash, PetAttackModeTexture)
-    elseif id == "pettarget" then local f = Root(id); return List(f and f.texture, f and f.nameBackground) end
+    elseif IsOwned(id) then local f = Root(id); return List(f and f.texture, f and f.nameBackground) end
     return {}
   end,
   -- Keep-list: rest zzz, combat swords, skull, hunter-pet happiness (functional UI; placed by Frames\Pet.lua)
@@ -62,7 +79,7 @@ VFS.ClientFlavours.classic_era = {
   end,
   ClassificationIcon = function(id)
     if id == "target" then return TargetFrameTextureFrameHighLevelTexture end
-    if id == "pettarget" then local f = Root(id); return f and f.skull end
+    if IsOwned(id) then local f = Root(id); return f and f.skull end
   end,
   PetHappinessFrame = function() return PetFrameHappiness end,
   HasReadablePetHappiness = function() return true end,   -- UnitPower("pet", 27) -> 976 / 1000 plain (2026-11-25)
@@ -81,42 +98,42 @@ VFS.ClientFlavours.classic_era = {
     if id == "player" then return PlayerPortrait
     elseif id == "target" then return TargetFramePortrait
     elseif id == "pet" then return PetPortrait
-    elseif id == "pettarget" then local f = Root(id); return f and f.portrait end
+    elseif IsOwned(id) then local f = Root(id); return f and f.portrait end
   end,
   NameText = function(id)
     if id == "player" then return PlayerName
     elseif id == "target" then return TargetFrameTextureFrameName or P(TargetTF(), "Name")
     elseif id == "pet" then return PetName
-    elseif id == "pettarget" then local f = Root(id); return f and f.name end
+    elseif IsOwned(id) then local f = Root(id); return f and f.name end
   end,
   HealthTexts = function(id)
     if id == "player" then return List(PlayerFrameHealthBarText, PlayerFrameHealthBarTextLeft, PlayerFrameHealthBarTextRight, PlayerFrameHealthBar and PlayerFrameHealthBar.TextString)
     elseif id == "target" then local t = TargetTF(); return List(t and t.HealthBarText, t and t.HealthBarTextLeft, t and t.HealthBarTextRight, TargetFrameTextureFrameDeadText)
     elseif id == "pet" then return List(PetFrameHealthBarText, PetFrameHealthBarTextLeft, PetFrameHealthBarTextRight)
-    elseif id == "pettarget" then local f = Root(id); return List(f and f.healthText, f and f.deadText) end
+    elseif IsOwned(id) then local f = Root(id); return List(f and f.healthText, f and f.deadText) end
     return {}
   end,
   PowerTexts = function(id)
     if id == "player" then return List(PlayerFrameManaBarText, PlayerFrameManaBarTextLeft, PlayerFrameManaBarTextRight, PlayerFrameManaBar and PlayerFrameManaBar.TextString)
     elseif id == "target" then local t = TargetTF(); return List(t and t.ManaBarText, t and t.ManaBarTextLeft, t and t.ManaBarTextRight)
     elseif id == "pet" then return List(PetFrameManaBarText, PetFrameManaBarTextLeft, PetFrameManaBarTextRight)
-    elseif id == "pettarget" then local f = Root(id); return List(f and f.powerText) end
+    elseif IsOwned(id) then local f = Root(id); return List(f and f.powerText) end
     return {}
   end,
   StockLevelRegions = function(id)
     if id == "player" then return List(PlayerLevelText)
     elseif id == "target" then return List(TargetFrameTextureFrameLevelText)
-    elseif id == "pettarget" then local f = Root(id); return List(f and f.level) end
+    elseif IsOwned(id) then local f = Root(id); return List(f and f.level) end
     return {}   -- pet: Blizzard has no level region
   end,
   NameBackground = function(id)
     if id == "target" then return TargetFrameNameBackground
-    elseif id == "pettarget" then local f = Root(id); return f and f.nameBackground end
+    elseif IsOwned(id) then local f = Root(id); return f and f.nameBackground end
   end,
   -- Era: stock bars are plain children; the audited R2 exception may resize/re-anchor them (Core\Geometry.lua).
   MovableBars = function(id)
     local out = {}
-    if id ~= "pettarget" then
+    if not IsOwned(id) then
       local h, p = VFS.Client.HealthBar(id), VFS.Client.PowerBar(id)
       if h then out[h] = true end
       if p then out[p] = true end

@@ -62,7 +62,30 @@ function Options.Create()
   reset:Add(Widgets.Button(reset, "Reset everything to defaults", function() DB.ResetAll(); RestyleAll(); Widgets.RefreshAll() end, 220), 22)
   reset:Finish(); page:Place(reset)
 
+  -- Reload banner (owner 2026-11-26). Turning "Use Velocity Frame Style" OFF cannot be undone in place: hooks, the
+  -- reparented portrait and stripped bar masks stay. The frame is left as-is, the user keeps twiddling, and this bar
+  -- at the bottom of the page does the /reload when they are done. Disabled frames are skipped at the next load.
+  local banner = CreateFrame("Frame", nil, page)
+  banner:SetHeight(44); banner:SetPoint("BOTTOMLEFT", page, "BOTTOMLEFT", 0, 0); banner:SetPoint("BOTTOMRIGHT", page, "BOTTOMRIGHT", 0, 0)
+  banner:SetFrameLevel(page:GetFrameLevel() + 20)
+  local bg = banner:CreateTexture(nil, "BACKGROUND"); bg:SetAllPoints(); bg:SetColorTexture(0.6, 0.1, 0.1, 0.85)
+  local msg = banner:CreateFontString(nil, "OVERLAY", "GameFontHighlight"); msg:SetPoint("LEFT", 16, 0)
+  msg:SetText("A frame's styling was turned off. The game needs to reload the interface to show Blizzard's frame again.")
+  local btn = CreateFrame("Button", nil, banner, "UIPanelButtonTemplate"); btn:SetSize(120, 24); btn:SetPoint("RIGHT", -16, 0)
+  btn:SetText("Reload UI"); btn:SetScript("OnClick", function() ReloadUI() end)
+  banner:Hide()
+  Options.reloadBanner = banner
+
   page:SetScript("OnShow", Options.Refresh)
+  -- Closing the options window with a reload pending reloads then and there (owner 2026-11-26): the user is done twiddling.
+  -- OnHide fires when Settings closes AND when switching to another category, so the latter is not a trigger: only when the
+  -- whole Settings panel is gone (checked on the next frame, because category switches hide us before the new one shows).
+  page:HookScript("OnHide", function()
+    if not Options.reloadNeeded then return end
+    C_Timer.After(0, function()
+      if Options.reloadNeeded and not (SettingsPanel and SettingsPanel:IsShown()) and not (InterfaceOptionsFrame and InterfaceOptionsFrame:IsShown()) then ReloadUI() end
+    end)
+  end)
   if Settings and Settings.RegisterCanvasLayoutCategory then
     category = Settings.RegisterCanvasLayoutCategory(page, page.name)
     Settings.RegisterAddOnCategory(category)
@@ -75,6 +98,13 @@ function Options.Refresh()
   if not page then return end
   Widgets.RefreshAll()
   page:FitHeight()
+  if Options.reloadBanner then Options.reloadBanner:SetShown(Options.reloadNeeded == true) end
+end
+
+-- Called by FramePage when "Use Velocity Frame Style" is unticked on a frame that is currently styled.
+function Options.RequestReload()
+  Options.reloadNeeded = true
+  if Options.reloadBanner then Options.reloadBanner:Show() end
 end
 
 function Options.Open()
