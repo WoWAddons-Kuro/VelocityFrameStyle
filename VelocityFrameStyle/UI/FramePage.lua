@@ -204,15 +204,16 @@ function FramePage.AddFrameExtras(box, id)
   end
 end
 
--- "Focus and Focus Target" (spec 12): ONE section, ONE enable box writing both records, the Focus body, then a
--- Focus Target sub-header with its body. Focus Target has no master switch - it exists whenever Focus does.
+-- Focus page (spec 12): ONE section, ONE enable box writing both records, then two sub-headings - "Focus" and
+-- "Focus' Target" (owner wording 2026-11-26) - each with its frame body. Focus' Target has no master switch; it exists
+-- whenever Focus does. The page/tree label is the short "Focus" so it fits the Settings category list.
 function FramePage.BuildFocusSection(content)
-  local box = Widgets.Section(content, "Focus and Focus Target")
+  local box = Widgets.Section(content, "Focus")
   AddEnableBox(box, { "focus", "focustarget" })
   local h1 = box:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge"); h1:SetText("Focus")
   box:Add(h1, 16, -8)
   AddFrameBody(box, "focus")
-  local h2 = box:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge"); h2:SetText("Focus Target")
+  local h2 = box:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge"); h2:SetText("Focus' Target")
   box:Add(h2, 16, -16)
   AddFrameBody(box, "focustarget")
   box:Finish()

@@ -74,15 +74,17 @@ CLASSIFICATION already include both.
 
 ## Plan
 
-- [ ] R0 - Revert attempt-1 pieces: `Frames\Focus.lua` restyle body, adapter `TargetLike`/`BlizzToT` refactor (Target resolvers back
+- [x] R0 - Revert attempt-1 pieces: `Frames\Focus.lua` restyle body, adapter `TargetLike`/`BlizzToT` refactor (Target resolvers back
       to `id == "target"`), the portrait-anchored PlaceBars. Keep: DB ids/globals, Chrome layouts, labels, FocusTarget.lua, options
       page, frame-level ToT suppression on Era/Forever, pulse alpha reset, OwnedUnitFrame.ApplyHideWhenMe.
-- [ ] R1 - `Focus.lua` = spec on the factory; `DB.DEFAULT_FOCUS_PLACEMENT`, `focusPlacement` in profile, `focusFlashOnNew` global;
+- [x] R1 - `Focus.lua` = spec on the factory; `DB.DEFAULT_FOCUS_PLACEMENT`, `focusPlacement` in profile, `focusFlashOnNew` global;
       FocusTarget anchorFrameName -> `VelocityFrameStyleFocus`.
-- [ ] R2 - Adapter: `focus` in OWNED; `ChromeRegions("focus")` = `{ FocusFrame }` gated on enabled; `Root("focus")` = our frame.
-- [ ] R3 - Bootstrap: Stage Focus (owned) + visibility + placement; drivers; `focus` value events.
-- [ ] R4 - Owner test on Forever: `/focus` a mob; drag Focus in Edit Mode (Focus Target follows); aggro onto you -> pet (the scenario
-      that broke attempt 1); Blizzard's FocusFrame invisible throughout; clicks/menu on both. Commit.
+- [x] R2 - Adapter: `focus` in OWNED; `ChromeRegions("focus")` = `{ FocusFrame }` gated on enabled; `Root("focus")` = our frame.
+- [x] R3 - Bootstrap: Stage Focus (owned) + visibility + placement; drivers; `focus` value events.
+- [x] R4 - Owner test on Forever 2026-11-26: Focus + Focus Target shown, aggro->pet scenario clean, Blizzard's FocusFrame invisible.
+      One follow-up fix landed in the same commit: `OwnedUnitFrame.ApplyPlacement` treats a saved `anchorTo` that is not the spec's
+      anchor (attempt-1 records said "FocusFrame") as "use the spec default" instead of the screen-centre fallback. **Committed `3b06674`.**
+- [ ] R5 - Era: nothing to do (no focus unit); confirm the page is absent and `/vfs status` rows show `-` when the owner next plays Era.
 
 ## Open
 

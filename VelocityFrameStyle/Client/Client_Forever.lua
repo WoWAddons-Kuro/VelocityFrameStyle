@@ -55,7 +55,10 @@ local function HealthValues(unit)
 end
 
 VFS.ClientFlavours.forever = {
-  HasFocusFrame = function() return FocusFrame ~= nil end,
+  -- The FRAME exists on every client (TargetFrame.xml ships FocusFrame even on Era); the UNIT only exists where /focus
+  -- is a real command (TBC+ rulesets). Owner dump on Era 2026-11-26: FocusFrame non-nil, SlashCmdList.FOCUS nil,
+  -- UnitExists("focus") false after /focus. Test the command, not the frame.
+  HasFocusFrame = function() return FocusFrame ~= nil and (SlashCmdList and SlashCmdList.FOCUS ~= nil or FocusUnit ~= nil) end,
   HasBossFrames = function() return Boss1TargetFrame ~= nil end,
   HasSecretValues = function() return true end,
   EditModeHint = function() return "Right-click your portrait and choose Edit Mode, or press Escape > Edit Mode." end,

@@ -105,10 +105,10 @@ function Options.Create()
   for _, id in ipairs(DB.FRAME_IDS) do
     if id == "focus" then
       if Client.HasFocusFrame() then
-        local sub = Widgets.Page("VelocityFrameStyleOptions_focus", "Focus and Focus Target",
+        local sub = Widgets.Page("VelocityFrameStyleOptions_focus", "Focus",
           "Settings for the Focus frame and its Focus Target. One switch styles both. Theme values are inherited from the main page unless overridden here.")
         sub:Place(VFS.FramePage.BuildFocusSection(sub.content))
-        subcategories.focus = RegisterPage(sub, "Focus and Focus Target", category)
+        subcategories.focus = RegisterPage(sub, "Focus", category)
         subcategories.focustarget = subcategories.focus
       end
     elseif id ~= "focustarget" then
