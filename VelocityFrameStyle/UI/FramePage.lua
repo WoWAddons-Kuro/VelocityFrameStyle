@@ -106,13 +106,15 @@ function FramePage.BuildFrameSection(content, id)
       end), 26)
   end
   box:Add(Widgets.Check(box, "Use Velocity Frame Style",
-    "Restyle this frame. Turning this off takes effect after the interface reloads (a Reload button appears at the bottom of the page).",
+    "Restyle this frame. Changing this takes effect after the interface reloads (a Reload button appears at the bottom of the page, and the UI reloads when you close Settings).",
     function() return DB.Frame(id).enabled end,
     function(v)
-      local wasStyled = VFS.Frames[id] ~= nil
       DB.Frame(id).enabled = v
-      Restyle(id)
-      if not v and wasStyled and VFS.Options and VFS.Options.RequestReload then VFS.Options.RequestReload() end
+      -- Either direction needs a reload (owner 2026-11-26): only the LOAD path builds a frame correctly - Stage order,
+      -- the chrome lists other frames compute at style time (Target hides Blizzard's ToT art only if tot is enabled),
+      -- secure drivers armed once. Turning ON live left Blizzard's ToT portrait drawing under ours; OFF left our bars.
+      -- Nothing is restyled here; the saved flag is honoured at the next load.
+      if VFS.Options and VFS.Options.RequestReload then VFS.Options.RequestReload() end
     end), 26)
   box:Add(Widgets.Text(box, "Bar dimensions only; text, portrait and borders do not zoom. Changes made in combat apply afterward."), 28)
   for _, definition in ipairs(DB.DIMENSION_CONTROLS) do

@@ -6,7 +6,8 @@ Detail lives in the numbered specs (07 review, 08 Era plan, 06 atlas). Started 2
 ## Classic Era refactor (spec 08, phases E0–E5)
 
 - [ ] E0 — contract + baseline: run tests, syntax-check, record Era build; remove dead client surface (`StockValueText`, `AdoptStock`/`vfsAdopted`, unused capability flags); required-vs-optional client methods, no silent Forever fallback
-- [ ] **NEXT SESSION: owned Target-of-Target frame** — handoff spec [11_Owned_ToT_Frame.md](11_Owned_ToT_Frame.md). Extract `OwnedUnitFrame` from PetTarget (T1, zero behaviour change), then ToT via the factory (T2–T3), Era test first, then Forever. Blizzard's ToT is not an Edit Mode system and is hidden when the target targets you — "sometimes" is correct behaviour, not a bug.
+- [x] **Owned Target-of-Target frame** (`4b239f5`, Forever-confirmed 2026-11-26) — [11_Owned_ToT_Frame.md](11_Owned_ToT_Frame.md). `OwnedUnitFrame` factory shared by Pet Target + ToT; ToT movable in Edit Mode; master switch + flash / health-only / hide-when-me options; "Use Velocity Frame Style" per frame with a Reload UI banner. Correction: Blizzard hides ToT only when you target *yourself*. **Still open:** Era play-test (T4), new default bar dimensions (Pet/PetTarget 80x17, ToT 50x10) + migration decision.
+- [ ] Forever pet frame fixes committed 2026-11-26 (`c923c9c`, `b74fdd8`): happiness icon follows bar width; happiness value is SECRET on Forever so the hover panel is XP-only there (spec 10). Open: Forever `GetPetFoodTypes` returned nothing — diet row dropped.
 - [ ] E1 — native hooks + legal anchors behind adapters; Geometry validate-before-clear, reentrancy guard, combat queue; connect or remove `ToT.OnEvent`
 - [ ] E2 — `Client.ResolveFrameBinding`; complete Era mappings for Player/Target/Pet/ToT/Pet Target (ToT missing on Era today); real-shaped fixtures
 - [ ] E3 — `GetPowerRowState` (visible/hidden/unknown) replaces `HasPowerResource`; verify Era APIs; Edit Mode layout matrix

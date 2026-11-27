@@ -51,10 +51,13 @@ end
 function Geometry.ApplyBarDimensions(st)
   if InCombatLockdown() then st.dimensionsPending = true; return false end
   st.dimensionsPending = nil
+  -- Owned frames (pettarget, tot - Frames\OwnedUnitFrame.lua): the bars are ours, always resizable.
+  local owned = VFS.OwnedUnitFrame and VFS.OwnedUnitFrame.Get(st.id)
+  local width = VFS.DB.BarDimension(st.id, "barWidth")
+  local healthH, powerH = VFS.DB.BarDimension(st.id, "healthHeight"), VFS.DB.BarDimension(st.id, "powerHeight")
   for kind, bar in pairs(st.bars) do
-    if st.id == "pettarget" or Allowed(st.id, bar.stock) then
-      local width = VFS.DB.BarDimension(st.id, "barWidth")
-      local height = VFS.DB.BarDimension(st.id, kind == "health" and "healthHeight" or "powerHeight")
+    if owned or Allowed(st.id, bar.stock) then
+      local height = kind == "health" and healthH or powerH
       bar.stock:SetWidth(width)
       bar.stock:SetHeight(height)
       if bar.stock.vfsGeometrySpec then
@@ -63,5 +66,7 @@ function Geometry.ApplyBarDimensions(st)
       end
     end
   end
+  -- Small owned frame: the button rect (= the Edit Mode selection box) follows the bars.
+  if owned and owned.spec.small then VFS.OwnedUnitFrame.FitSmall(owned, width, healthH, powerH) end
   return true
 end
