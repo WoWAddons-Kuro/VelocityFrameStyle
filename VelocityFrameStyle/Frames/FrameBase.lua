@@ -557,7 +557,10 @@ function FrameBase.ApplyAppearance(st)
   local name = Client.NameText(id); if name then name:SetAlpha(a) end
   for _, t in ipairs(Client.HealthTexts(id)) do if not t.vfsAdopted then t:SetAlpha(a) end end
   for _, t in ipairs(Client.PowerTexts(id)) do if not t.vfsAdopted then t:SetAlpha(a) end end
-  for _, r in ipairs(Client.StockLevelRegions(id)) do r:SetAlpha(a) end
+  -- Stock level text and circle art stay shown but fully transparent; never fight native visibility updates.
+  for _, r in ipairs(Client.StockLevelRegions(id)) do
+    FrameBase.SetChromeSuppressed(r, id, enabled)
+  end
   -- Fonts for every element
   local font, style = DB.Effective(id, "font"), DB.Effective(id, "fontStyle")
   local elements = DB.Elements(id)

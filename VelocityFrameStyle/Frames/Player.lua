@@ -25,6 +25,16 @@ function Player.Create()
   for _, fn in ipairs({ "PlayerFrame_ToPlayerArt", "PlayerFrame_UpdateArt", "PlayerFrame_UpdateHealthBarVisuals", "PlayerFrame_UpdateManaBarVisuals" }) do
     if _G[fn] then hooksecurefunc(fn, function() PlaceBars(st); FrameBase.Restyle("player") end) end
   end
+  -- Forever's level update resets text alpha to 1 without calling SetAlpha (verified in game).
+  -- Reapply transparency after that native update; leave visibility and our own badge alone.
+  if PlayerFrame_UpdateLevel then
+    hooksecurefunc("PlayerFrame_UpdateLevel", function()
+      if not DB.Frame("player").enabled then return end
+      for _, region in ipairs(Client.StockLevelRegions("player")) do
+        FrameBase.SetChromeSuppressed(region, "player", true)
+      end
+    end)
+  end
   FrameBase.Restyle("player")
   return st
 end
