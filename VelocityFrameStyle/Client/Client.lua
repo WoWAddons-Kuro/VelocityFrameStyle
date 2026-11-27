@@ -51,9 +51,13 @@ Client.INTERFACE = {
   "HasPowerResource",    -- (unit) -> true|false|nil; resource presence, not whether current power is nonzero
   -- Values ------------------------------------------------------------------------------------
   "UnitDisplayName",      -- (unit) -> string      two-name aware (PROJECT_STRUCTURE two-names rule)
-  "FormatBarValue",       -- (unit, health|power, current|current_max|percent) -> text (possibly secret), available boolean
+  "FormatBarValue",       -- (unit, health|power|mana, current|current_max|percent) -> text (possibly secret), available boolean
   "HealthValues",         -- (unit) -> cur|nil, max|nil, pct|nil
   "PowerValues",          -- (unit) -> cur|nil, max|nil, pct|nil, token|nil
+  "ManaValues",           -- (unit) -> cur|nil, max|nil, pct|nil   the MANA pool regardless of display power (druid forms,
+                          --   SPECS/14); Plain()-ed, so Forever returns nil for cur (secret) and a plain max.
+  "ManaBarValues",        -- (unit) -> cur (MAY BE SECRET), max (plain|nil)   for StatusBar:SetMinMaxValues/SetValue ONLY.
+                          --   Never compare or format the first return in Lua.
   "DifficultyColor",      -- (level) -> r, g, b
 }
 
@@ -74,6 +78,22 @@ function Client.CommonPower(unit)
   local pct = (cur and max and max > 0) and (cur / max) or nil
   local _, token = UnitPowerType(unit)
   return cur, max, pct, Util.Plain(token)
+end
+
+-- The mana pool by explicit power type. Verified (owner 2026-11-27, Bear form): Era 373/490 plain; Forever <secret>/862.
+-- _EXTERNAL_APIS\wow_druid_mana_in_forms.md
+Client.MANA_POWER_TYPE = (Enum and Enum.PowerType and Enum.PowerType.Mana) or 0
+
+function Client.CommonMana(unit)
+  local Util = VFS.Util
+  local cur = Util.PlainNumber(UnitPower(unit, Client.MANA_POWER_TYPE), nil)
+  local max = Util.PlainNumber(UnitPowerMax(unit, Client.MANA_POWER_TYPE), nil)
+  local pct = (cur and max and max > 0) and (cur / max) or nil
+  return cur, max, pct
+end
+
+function Client.CommonManaBarValues(unit)
+  return UnitPower(unit, Client.MANA_POWER_TYPE), VFS.Util.PlainNumber(UnitPowerMax(unit, Client.MANA_POWER_TYPE), nil)
 end
 
 function Client.CommonDifficultyColor(level)

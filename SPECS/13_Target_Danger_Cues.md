@@ -11,7 +11,7 @@ Workspace rule: **copy, never cross-addon dependency.**
 |---|---|---|
 | Q1 | Where do skulls + red level go? | **New `danger` row ABOVE the name row**, right-aligned, shown only while the target is dangerous. The Level element stays where the user put it (portrait badge by default). Matches the VPS screenshot: `💀💀 13` over `Blackmoss th...  273`. |
 | Q2 | Health bar colour? | Blizzard does **not** reaction-colour the stock TargetFrame health bar (only the name strip, which VFS alpha-zeros). So: **Hardcore option `reactionHealth`** - red hostile / yellow neutral / green friendly NPC bar on Target, independent of danger. Players keep green / class colour. |
-| Q3 | Animation? | **Port the VPS sweep** - `leftgrad.tga` tiled over the health fill, XML `TextureCoordTranslation`, 50% black dimmer, contrast colour (yellow over red, red over yellow/green). Red modes also turn the health bar's border ring red. |
+| Q3 | Animation? | **Port the VPS sweep** - `leftgrad.tga` tiled over the health fill, XML `TextureCoordTranslation`, 50% black dimmer, contrast colour (yellow over red, red over yellow/green). ~~Red modes also turn the border ring red~~ - **owner 2026-11-27 after test: border stays black; sweep off while the target is dead.** |
 | Q4 | Scope / frames? | **Account-wide** (`DB.Global().danger`), **Target frame only** in v1. Owner 2026-11-27: "keep it simple". No scope switch; moving to the per-layout profile record is a later, separate decision. |
 
 ## Data
@@ -110,11 +110,11 @@ the name). Every setter writes `DB.Danger()[key]` then `Restyle("target")`.
 - [ ] ReactionColor: reaction 2 red, 4 yellow, 5 green, player nil, secret nil
 
 ## Implementation checklist
-- [ ] M1 `Core\Danger.lua` + `DB.DEFAULT_DANGER` / `DB.Danger()` + `Tests\Danger.lua` green
-- [ ] M2 danger row + red Level on Target (no bar effects yet) - owner verifies screenshot parity on Era
-- [ ] M3 `reactionHealth` colour + `UNIT_FACTION`/`UNIT_FLAGS` refresh
-- [ ] M4 `leftgrad.tga`, `Templates.xml` in 3 TOCs, `Frames\DangerCue.lua` sweep/dim/ring; level audit with `/vfs stack`
-- [ ] M5 Options block; `LayoutProfile.OnChanged` restyle; `09_TODO.md` item ticked; `00` file list updated
+- [x] M1 `Core\Danger.lua` + `DB.Danger()` + `Tests\Danger.lua` green (3225f55)
+- [x] M2 danger row + red Level on Target - owner verified on Era 2026-11-27
+- [x] M3 `reactionHealth` colour + refresh; attacked neutral reads red via `UnitAffectingCombat(unit)`, same test as the combat glow (0cc6c28)
+- [x] M4 `leftgrad.tga`, `Templates.xml`, `Frames\DangerCue.lua` sweep + dimmer. **Amended in test:** border stays BLACK in every mode; sweep stops when the target is dead
+- [x] M5 Options block (slider `fmt` kept short - it prints under both track ends); `09_TODO.md`; `00` file list. No LayoutProfile hook (account-wide)
 
 ## Open questions
 - Danger row font size: Level size + 2 (proposed) - owner may want a fixed size. TBD after M2 screenshot.

@@ -70,7 +70,7 @@ VelocityFrameStyleDB = {version=1, frames={pet={dimensions={barWidth=180}, eleme
 }}}, profiles={Test={petTargetPlacement={point='CENTER', x=100,y=20}}}}
 ns.DB.Init()
 local elements = ns.DB.Elements('pet')
-assert(#elements==4 and ns.db.version==2)
+assert(#elements==5 and ns.db.version==2)
 assert(elements[1].anchor=='above' and elements[1].size==14 and elements[1].customColor[1]==1)
 assert(elements[2].anchor=='hidden' and elements[2].size==12)
 assert(elements[3].valueFormat=='current' and elements[4].valueFormat=='current')

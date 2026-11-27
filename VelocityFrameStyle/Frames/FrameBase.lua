@@ -113,6 +113,13 @@ local function ApplyPowerColor(bar, unit)
 end
 FrameBase.ApplyHealthColor, FrameBase.ApplyPowerColor = ApplyHealthColor, ApplyPowerColor
 
+-- The druid mana bar (SPECS/14) is always MANA blue: ApplyPowerColor would read the DISPLAY power (rage/energy).
+local function ApplyManaColor(bar)
+  local c = PowerBarColor and PowerBarColor.MANA
+  if c then bar:SetStatusBarColor(c.r, c.g, c.b) else bar:SetStatusBarColor(0, 0, 1) end
+end
+FrameBase.ApplyManaColor = ApplyManaColor
+
 -- Blizzard recolours its bar on every update; keep ours after it. Reentrancy-guarded.
 local function HookColor(st, kind, bar)
   if bar.vfsColorHooked then return end
@@ -543,7 +550,9 @@ function FrameBase.ApplyAppearance(st)
   for kind, bar in pairs(st.bars) do
     if enabled then
       FrameBase.ApplyBarFill(st, bar.stock)
-      if kind == "health" then ApplyHealthColor(bar.stock, st.unit, st.id) else ApplyPowerColor(bar.stock, st.unit) end
+      if kind == "health" then ApplyHealthColor(bar.stock, st.unit, st.id)
+      elseif kind == "mana" then ApplyManaColor(bar.stock)
+      else ApplyPowerColor(bar.stock, st.unit) end
       FrameBase.ColorBackdrop(bar.stock, backing)
       bar.backdrop:Show()
       bar.backdrop.ring:Show()

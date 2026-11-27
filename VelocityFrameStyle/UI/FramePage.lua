@@ -11,7 +11,7 @@ local LABELS = { player = "Player", target = "Target", pet = "Pet", pettarget = 
   focus = "Focus", focustarget = "Focus Target" }
 FramePage.LABELS = LABELS
 
-local ANCHORS = { { "nameplate", "Name row" }, { "health", "Health bar" }, { "power", "Power bar" }, { "above", "Above" }, { "below", "Below" }, { "portrait", "Portrait badge" }, { "hidden", "Hidden" } }
+local ANCHORS = { { "nameplate", "Name row" }, { "health", "Health bar" }, { "power", "Power bar" }, { "mana", "Mana bar (druid forms)" }, { "above", "Above" }, { "below", "Below" }, { "portrait", "Portrait badge" }, { "hidden", "Hidden" } }
 local ALIGNS  = { { "left", "Left" }, { "center", "Center" }, { "right", "Right" } }
 local COLORS  = { { "stock", "Stock" }, { "white", "White" }, { "difficulty", "Difficulty" }, { "class", "Class" }, { "reaction", "Reaction" }, { "custom", "Custom" } }
 local SIZES = {}
@@ -75,7 +75,7 @@ local function ElementRow(box, id, index)
     row:SetShown(e ~= nil)
     if not e then return end
     row.label:SetText(e.label or e.id)
-    valueFormat:SetShown(e.id == "health" or e.id == "power")
+    valueFormat:SetShown(e.id == "health" or e.id == "power" or e.id == "mana")
     local c = e.customColor or { 1, 1, 1 }
     row.swatch.tex:SetColorTexture(c[1], c[2], c[3])
     row.swatch:SetShown(e.color == "custom")
@@ -129,6 +129,11 @@ end
 -- The section ----------------------------------------------------------------------------------------------
 function FramePage.BuildFrameSection(content, id)
   local box = Widgets.Section(content, LABELS[id] or id)
+  -- R7 stand-down is announced once in chat at login and is easy to miss; say it where the user is actually looking
+  -- (owner 2026-11-27: tested the druid mana bar on Forever with EasyFrames still enabled).
+  if VFS.standDown then
+    box:Add(Widgets.Text(box, "|cffff4040Standing down:|r " .. tostring(VFS.standDown) .. " is loaded and owns the unit frames, so Velocity Frame Style is not styling anything. Disable it and reload to use these settings."), 28)
+  end
   if id == "tot" then
     -- Master switch for a target-of-target frame AT ALL (owner 2026-11-26): Blizzard's CVar showTargetOfTarget
     -- (Interface > Combat) AND whether our owned frame runs. Off = neither frame. On = ours when "Use Velocity Frame
@@ -179,6 +184,16 @@ end
 
 -- Frame extras (per-id odds and ends)
 function FramePage.AddFrameExtras(box, id)
+  if id == "player" then
+    local _, class = UnitClass("player")
+    if Util.Plain(class) == "DRUID" then
+      box:Add(Widgets.Check(box, "Druid: show mana while shapeshifted",
+        "A third bar under the power bar shows your mana pool in Bear / Cat form. Hidden in caster form (the power bar is mana then), in Moonkin on Forever (the game shows its own), and in vehicles.",
+        function() return DB.Global().druidManaBar ~= false end, function(v) DB.Global().druidManaBar = v; Restyle(id); if VFS.Player and VFS.Player.ApplyManaBar then VFS.Player.ApplyManaBar() end end), 26, -8)
+      local sd = VFS.Player and VFS.Player.ManaBarStandDown and VFS.Player.ManaBarStandDown()
+      if sd then box:Add(Widgets.Text(box, "|cffff8040" .. sd .. " is loaded|r - it draws its own druid mana bar, so ours stays off. Disable it to use this one."), 14) end
+    end
+  end
   if id == "target" then
     -- Danger Highlight (SPECS/13): port of VelocityPlateStyle's Hardcore cues. Account-wide, Target only.
     local hdr = box:CreateFontString(nil, "ARTWORK", "GameFontNormal"); hdr:SetText("Danger Highlight (Hardcore)")

@@ -16,7 +16,7 @@ local DB_VERSION = 2
 -- VFS_TextElement = { id, label, format, anchor, align, size, color, customColor = {r,g,b} }
 local function E(id, label, format, anchor, align, size, color)
   return { id = id, label = label, format = format, anchor = anchor, align = align, size = size, color = color,
-    valueFormat = (id == "health" or id == "power") and "current" or nil }
+    valueFormat = (id == "health" or id == "power" or id == "mana") and "current" or nil }
 end
 
 -- Default element rows, identical for every frame (order = flow order within a slot).
@@ -26,6 +26,9 @@ local function DefaultElements()
     E("level",     "Level",    "[level]",  "portrait",  "center", 10, "difficulty"),   -- badge on the portrait rim (owner 2026-11-25)
     E("health",    "Health",   "[hp]",     "health",    "center", 10, "white"),
     E("power",     "Power",    "[power]",  "power",     "center", 10, "white"),
+    -- Druid mana while shapeshifted (SPECS/14): the row exists on every frame (uniform grid) but only Player has a
+    -- `mana` slot; elsewhere the element is simply never laid out. Hidden by default so non-druids see nothing new.
+    E("mana",      "Mana (forms)", "[mana]", "mana",    "center", 9,  "white"),
   }
 end
 
@@ -58,6 +61,7 @@ DB.DEFAULT_GLOBAL = {
   -- Era hunter pets: hover panel on the happiness icon / pet level badge (SPECS/10)
   petHappinessPanel = true,
   petHappinessPanelShiftOnly = false,   -- show the panel only while Shift is held
+  druidManaBar = true,                  -- SPECS/14: druids see their mana pool as a third Player bar in Bear/Cat
   -- Target danger cues (SPECS/13; port of VelocityPlateStyle's Danger Highlight). Account-wide (owner 2026-11-27).
   danger = {                            -- VFS_DangerSettings
     overLevelMode = "animatedRed",      -- VFS_OverLevelMode: none | animated | red | animatedRed
@@ -105,6 +109,12 @@ function DB.Init()
     db.frames[id] = db.frames[id] or DefaultFrame()
     db.frames[id].override = db.frames[id].override or {}
     if type(db.frames[id].elements) ~= "table" or #db.frames[id].elements == 0 then db.frames[id].elements = DefaultElements() end
+    -- Every built-in element must exist once (a newer default appended; SPECS/14 added `mana` 2026-11-27).
+    local have = {}
+    for _, e in ipairs(db.frames[id].elements) do have[e.id] = true end
+    for _, def in ipairs(DefaultElements()) do
+      if not have[def.id] then db.frames[id].elements[#db.frames[id].elements + 1] = def end
+    end
     if (db.version or 1) < 2 then
       local old = {}
       for _, e in ipairs(db.frames[id].elements) do old[e.id] = e end

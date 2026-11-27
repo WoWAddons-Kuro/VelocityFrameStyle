@@ -31,6 +31,7 @@ local function Status()
   local ci = Util.ClientInfo()
   Util.Print("version %s | client %s %s (build %s, interface %s) | character %s", tostring(version), Client.flavour, ci.Version, ci.Build, tostring(ci.Interface), tostring(UnitGUID("player")))
   Util.Print("stand-down: %s | pet-target stand-down: %s", tostring(VFS.standDown), tostring(VFS.standDownPetTarget))
+  if VFS.Frames.player and VFS.Frames.player.manaBarStandDown then Util.Print("druid mana bar: OFF - %s draws its own", VFS.Frames.player.manaBarStandDown) end
   for _, id in ipairs(DB.FRAME_IDS) do
     local st = VFS.Frames[id]
     local hb, pb = Client.HealthBar(id), Client.PowerBar(id)
@@ -422,6 +423,13 @@ local function OnEvent(_, event, arg1, arg2)
     for _, ev in ipairs({ "UNIT_HEALTH", "UNIT_MAXHEALTH", "UNIT_POWER_UPDATE", "UNIT_MAXPOWER", "UNIT_DISPLAYPOWER" }) do
       f:RegisterUnitEvent(ev, "targettarget", "focus", "focustarget")
     end
+    -- Druid mana bar (SPECS/14 D7): only when the Player frame actually built one (druid, styled, no stand-down).
+    if VFS.Frames.player and VFS.Frames.player.bars.mana then
+      for _, ev in ipairs({ "UNIT_POWER_UPDATE", "UNIT_POWER_FREQUENT", "UNIT_MAXPOWER", "UNIT_DISPLAYPOWER", "UNIT_ENTERED_VEHICLE", "UNIT_EXITED_VEHICLE" }) do
+        f:RegisterUnitEvent(ev, "player")
+      end
+      f:RegisterEvent("UPDATE_SHAPESHIFT_FORM")
+    end
     Util.Print("loaded (%s). /vfs for options, /vfs status for details", Client.flavour)
   elseif event == "ADDON_ACTION_BLOCKED" or event == "ADDON_ACTION_FORBIDDEN" then
     if arg1 == ADDON_NAME then
@@ -453,7 +461,8 @@ local function OnEvent(_, event, arg1, arg2)
     if VFS.Focus.frame then VFS.Focus.OnEvent(event) end
     if VFS.FocusTarget.frame then VFS.FocusTarget.OnEvent(event) end
   elseif event == "UNIT_HEALTH" or event == "UNIT_MAXHEALTH" or event == "UNIT_POWER_UPDATE" or event == "UNIT_MAXPOWER" or event == "UNIT_DISPLAYPOWER" then
-    -- registered for the owned event-driven units only (pettarget fires none and polls instead)
+    -- owned event-driven units (pettarget fires none and polls instead) + the player's druid mana bar
+    if arg1 == "player" and VFS.Frames.player then VFS.Player.OnEvent(event, arg1) end
     if arg1 == "targettarget" and VFS.ToT.frame then VFS.ToT.OnEvent(event, arg1) end
     if arg1 == "focus" and VFS.Focus.frame then VFS.Focus.OnEvent(event, arg1) end
     if arg1 == "focustarget" and VFS.FocusTarget.frame then VFS.FocusTarget.OnEvent(event, arg1) end

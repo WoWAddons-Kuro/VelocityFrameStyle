@@ -22,7 +22,8 @@ local function SOFT_DISC() return VFS.RoundedShapes.softDisc end
 -- With geometric chrome there is no art slot to fill, so power bars are the SAME width as the health bar and flush
 -- under it (EF's wider power bars - 117 / 125 / 76 - were sized to EF's painted slots and read as misaligned here).
 Chrome.LAYOUT = {
-  player    = { health = { w = 113, h = 24 }, power = { w = 113, h = 12 }, nameRow = 12, platePad = 4, discPad = 5, plateOverlap = 1.0, side = "right" },
+  -- mana: the druid forms mana bar (SPECS/14), same width as power, flush under it
+  player    = { health = { w = 113, h = 24 }, power = { w = 113, h = 12 }, mana = { w = 113, h = 8 }, nameRow = 12, platePad = 4, discPad = 5, plateOverlap = 1.0, side = "right" },
   target    = { health = { w = 113, h = 24 }, power = { w = 113, h = 12 }, nameRow = 12, platePad = 4, discPad = 5, plateOverlap = 1.0, side = "left" },
   pet       = { health = { w = 70,  h = 10 }, power = { w = 70,  h = 7 },  nameRow = 11, platePad = 3, discPad = 3, plateOverlap = 1.0, side = "right" },
   tot       = { health = { w = 70,  h = 10 }, power = { w = 70,  h = 7 },  nameRow = 11, platePad = 3, discPad = 3, plateOverlap = 1.0, side = "right" },
@@ -44,6 +45,29 @@ local function PlateColor()
 end
 
 -- Build ------------------------------------------------------------------------------------------------
+-- One combat-glow ring for a bar: same rounded atlas as the black border, ADD-blended, levelled just above that bar's
+-- upper black ring (bar + vfsBorderLevelOffset + 1). Shared by Create (health/power) and AddBarRing (bars a frame
+-- module adds later, e.g. the druid mana bar - SPECS/14).
+function Chrome.CreateBarRing(glowFrame, stock)
+  local ring = VFS.FrameBase.CreateSurfaceBorder(glowFrame, stock, Chrome.COMBAT_OUTLINE_THICKNESS)
+  if ring.SetBorderBlendMode then ring:SetBorderBlendMode("ADD") end
+  local function SyncLevel()
+    ring:SetFrameStrata(stock:GetFrameStrata())
+    ring:SetFrameLevel(stock:GetFrameLevel() + (stock.vfsBorderLevelOffset or 1) + 1)
+  end
+  SyncLevel()
+  hooksecurefunc(stock, "SetFrameLevel", SyncLevel)
+  hooksecurefunc(stock, "SetFrameStrata", SyncLevel)
+  return ring
+end
+
+function Chrome.AddBarRing(st, kind)
+  local c, bar = st.chrome, st.bars[kind]
+  if not c or not bar or c.glow.rings[kind] then return end
+  c.glow.rings[kind] = Chrome.CreateBarRing(c.glow.frame, bar.stock)
+  Chrome.ApplyColors(st)
+end
+
 function Chrome.Create(st)
   if st.chrome then return st.chrome end
   local button = st.button
@@ -83,19 +107,7 @@ function Chrome.Create(st)
   -- Per-bar glow rings. Parented to glowFrame (inherits its alpha) but levelled with the bar so each sits just above
   -- that bar's upper black ring, which FrameBase keeps at bar level + vfsBorderLevelOffset (1, or 2 with predictions).
   local rings = {}
-  for kind, bar in pairs(st.bars) do
-    local stock = bar.stock
-    local ring = VFS.FrameBase.CreateSurfaceBorder(glowFrame, stock, Chrome.COMBAT_OUTLINE_THICKNESS)
-    if ring.SetBorderBlendMode then ring:SetBorderBlendMode("ADD") end
-    local function SyncLevel()
-      ring:SetFrameStrata(stock:GetFrameStrata())
-      ring:SetFrameLevel(stock:GetFrameLevel() + (stock.vfsBorderLevelOffset or 1) + 1)
-    end
-    SyncLevel()
-    hooksecurefunc(stock, "SetFrameLevel", SyncLevel)
-    hooksecurefunc(stock, "SetFrameStrata", SyncLevel)
-    rings[kind] = ring
-  end
+  for kind, bar in pairs(st.bars) do rings[kind] = Chrome.CreateBarRing(glowFrame, bar.stock) end
 
   -- THE STACK (owner, Era 2026-11-26, after three rounds of chasing Blizzard's bar levels). The portrait group - plate
   -- disc, portrait, black rim, rim glow - goes on a LOWER STRATA than the bars, not a lower level. Strata beats level

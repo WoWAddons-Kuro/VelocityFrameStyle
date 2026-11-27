@@ -12,7 +12,7 @@ for _, id in ipairs({'player','target','pet','pettarget','tot','focus','focustar
   assert(type(ns.DB.Elements(id))=='table', 'missing elements: '..id)
   assert(ns.Chrome.LAYOUT[id], 'missing geometry: '..id)
 end
-assert(#ns.DB.Elements('tot')==4 and ns.DB.Frame('tot').enabled)
+assert(#ns.DB.Elements('tot')==5 and ns.DB.Frame('tot').enabled)
 assert(ns.DB.Frame('player').dimensions.barWidth==220)
 assert(ns.DB.Elements('player')[1].valueFormat=='percent')
 function UnitExists() return false end
@@ -25,5 +25,5 @@ ns.Chrome.UpdateCombat(st) -- reported nil dereference in combat event
 assert(alpha==0)
 ns.DB.Frame('tot').enabled=false; ns.DB.Init()
 assert(ns.DB.Frame('tot').enabled==false, 'login must preserve existing settings')
-ns.DB.ResetFrame('tot'); assert(ns.DB.Frame('tot').enabled and #ns.DB.Elements('tot')==4)
+ns.DB.ResetFrame('tot'); assert(ns.DB.Frame('tot').enabled and #ns.DB.Elements('tot')==5)
 print('PASS: all frame settings exist, ToT added to v2 saves, text/combat paths and settings preservation')

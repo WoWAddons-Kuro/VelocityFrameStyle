@@ -130,7 +130,7 @@ function TextLayout.ApplyTexts(host, elements, unit, stockNameFS, filter)
       local text
       local directValue = false
       local available = true
-      if e.id == "health" or e.id == "power" then
+      if e.id == "health" or e.id == "power" or e.id == "mana" then
         text, available = VFS.Client.FormatBarValue(unit, e.id, e.valueFormat or "current")
         directValue = true
       elseif Format.IsBareName(e.format) then
@@ -246,7 +246,7 @@ end
 -- 'portrait' is the badge on the portrait rim (FrameBase.PortraitBadge): elements are centred on it, align ignored,
 -- and the badge itself is shown only while at least one visible element sits there.
 function TextLayout.Layout(host, elements, slots)
-  local rows = { health = {}, power = {}, nameplate = {}, above = {}, below = {}, portrait = {} }
+  local rows = { health = {}, power = {}, mana = {}, nameplate = {}, above = {}, below = {}, portrait = {} }
   for _, e in ipairs(elements) do
     local fs = host.text[e.id]
     if fs and fs.vfsVisible then
@@ -257,6 +257,7 @@ function TextLayout.Layout(host, elements, slots)
   end
   if slots.health then LayoutRow(rows.health, slots.health, "inside") end
   if slots.power then LayoutRow(rows.power, slots.power, "inside") end
+  if slots.mana then LayoutRow(rows.mana, slots.mana, "inside") end       -- druid forms mana bar (SPECS/14); nil while hidden
   if slots.nameplate then LayoutRow(rows.nameplate, slots.nameplate, "inside") end
   if slots.above then LayoutRow(rows.above, slots.above, "above") end
   if slots.below then LayoutRow(rows.below, slots.below, "below") end

@@ -10,6 +10,9 @@ local Geometry = {}
 VFS.Geometry = Geometry
 
 local function Allowed(frameID, bar)
+  -- Bars WE created (bar.vfsOwned: the druid mana bar, SPECS/14) are always ours to place; the MovableBars
+  -- audit is for Blizzard's stock regions only.
+  if bar and bar.vfsOwned then return true end
   local movable = VFS.Client.MovableBars(frameID)
   return movable and movable[bar] == true
 end
@@ -20,9 +23,12 @@ function Geometry.PlaceBar(frameID, bar, spec)
   if not bar or not Allowed(frameID, bar) then return false end
   if InCombatLockdown() then return false end
   if VFS.DB.Frame(frameID) then
-    local kind = bar == VFS.Client.HealthBar(frameID) and "healthHeight" or "powerHeight"
     spec.width = VFS.DB.BarDimension(frameID, "barWidth")
-    spec.height = VFS.DB.BarDimension(frameID, kind)
+    -- Stock bars take the user's dimension sliders; an owned extra bar (mana) keeps the height its module asked for.
+    if not bar.vfsOwned then
+      local kind = bar == VFS.Client.HealthBar(frameID) and "healthHeight" or "powerHeight"
+      spec.height = VFS.DB.BarDimension(frameID, kind)
+    end
   end
   local ok, err = pcall(function()
     bar:ClearAllPoints()
@@ -31,16 +37,30 @@ function Geometry.PlaceBar(frameID, bar, spec)
     if spec.height then bar:SetHeight(spec.height) end
   end)
   if not ok then Util.WarnOnce("geometry:" .. frameID, "could not place a bar on " .. frameID .. ": " .. tostring(err)) end
-  -- Blizzard re-anchors some bars in its own art functions; re-assert once after it does.
+  -- Blizzard re-anchors AND re-sizes bars in its own art functions; re-assert after either. Size matters as much as
+  -- position: on Forever, shifting into Bear changes max health, which re-runs PlayerFrame_UpdateHealthBarVisuals ->
+  -- healthBarContainer/HealthBar:SetWidth(124) with NO SetPoint, so a point-only hook let the health bar grow to 124
+  -- while power/mana stayed 113 (owner 2026-11-27: "bars get short on Bear and stay that way until /reload").
   if ok and not bar.vfsGeometryHooked then
     bar.vfsGeometryHooked = true
     bar.vfsGeometrySpec = spec
-    hooksecurefunc(bar, "SetPoint", function(b, _, _, _, _, _, flag)
-      if flag == "VFS" or InCombatLockdown() or not b.vfsGeometrySpec then return end
+    local reasserting = false
+    local function Reassert(b)
+      if reasserting or InCombatLockdown() or not b.vfsGeometrySpec then return end
+      reasserting = true
       local s = b.vfsGeometrySpec
       b:ClearAllPoints()
       b:SetPoint(s.point, s.relTo, s.relPoint, s.x or 0, s.y or 0, "VFS")
+      if s.width then b:SetWidth(s.width) end
+      if s.height then b:SetHeight(s.height) end
+      reasserting = false
+    end
+    hooksecurefunc(bar, "SetPoint", function(b, _, _, _, _, _, flag)
+      if flag ~= "VFS" then Reassert(b) end
     end)
+    hooksecurefunc(bar, "SetWidth", Reassert)
+    hooksecurefunc(bar, "SetHeight", Reassert)
+    hooksecurefunc(bar, "SetSize", Reassert)
   elseif ok then
     bar.vfsGeometrySpec = spec
   end
@@ -56,7 +76,7 @@ function Geometry.ApplyBarDimensions(st)
   local width = VFS.DB.BarDimension(st.id, "barWidth")
   local healthH, powerH = VFS.DB.BarDimension(st.id, "healthHeight"), VFS.DB.BarDimension(st.id, "powerHeight")
   for kind, bar in pairs(st.bars) do
-    if owned or Allowed(st.id, bar.stock) then
+    if (owned or Allowed(st.id, bar.stock)) and not bar.stock.vfsOwned then   -- owned extra bars keep their own height
       local height = kind == "health" and healthH or powerH
       bar.stock:SetWidth(width)
       bar.stock:SetHeight(height)

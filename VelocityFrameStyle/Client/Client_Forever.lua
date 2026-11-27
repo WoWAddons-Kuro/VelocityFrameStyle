@@ -250,10 +250,15 @@ VFS.ClientFlavours.forever = {
   HealthValues = HealthValues,
   -- Same API path as the installed Forever EasyFrames: secret numbers go only
   -- through Blizzard formatters, then straight to SetText. Never inspect the result.
+  -- kind "mana" (SPECS/14): the mana pool by explicit type while a druid shows rage/energy; current is SECRET here.
   FormatBarValue = function(unit, kind, mode)
     local isHealth = kind == "health"
+    local isMana = kind == "mana"
+    local manaType = Client.MANA_POWER_TYPE
     local maximum
-    if isHealth then maximum = UnitHealthMax(unit) else maximum = UnitPowerMax(unit) end
+    if isHealth then maximum = UnitHealthMax(unit)
+    elseif isMana then maximum = UnitPowerMax(unit, manaType)
+    else maximum = UnitPowerMax(unit) end
     local plainMax = Util.PlainNumber(maximum, nil)
     if not isHealth and plainMax and plainMax <= 0 then return "", false end
     if mode == "percent" then
@@ -265,16 +270,20 @@ VFS.ClientFlavours.forever = {
         percent = UnitHealthPercent(unit, true, CurveConstants.ScaleTo100)
       else
         if not UnitPowerPercent then return "", false end
-        percent = UnitPowerPercent(unit, nil, false, CurveConstants.ScaleTo100)
+        percent = UnitPowerPercent(unit, isMana and manaType or nil, false, CurveConstants.ScaleTo100)
       end
       return C_StringUtil.RoundToNearestString(percent) .. "%", true
     end
     local current
-    if isHealth then current = UnitHealth(unit) else current = UnitPower(unit) end
+    if isHealth then current = UnitHealth(unit)
+    elseif isMana then current = UnitPower(unit, manaType)
+    else current = UnitPower(unit) end
     local numberText = AbbreviateNumbers or BreakUpLargeNumbers
     if mode == "current_max" then return numberText(current) .. " / " .. numberText(maximum), true end
     return numberText(current), true
   end,
   PowerValues = Client.CommonPower,
+  ManaValues = Client.CommonMana,
+  ManaBarValues = Client.CommonManaBarValues,
   DifficultyColor = Client.CommonDifficultyColor,
 }

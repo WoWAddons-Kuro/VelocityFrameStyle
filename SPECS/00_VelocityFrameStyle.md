@@ -104,7 +104,7 @@ VelocityFrameStyle/                                 repo root (git)
   Core/DB.lua                       VelocityFrameStyleDB = { version, global = VFS_GlobalSettings, frames = { [VFS_FrameID] = VFS_FrameSettings }, profiles = { [layoutName] = VFS_ProfileRecord } }
   Core/LayoutProfile.lua            Edit Mode layout -> record (copy of VST/VPTF)
   Core/Format.lua                   token expander (lifted from PlateStyle Format.lua, + power tokens)
-  Core/Danger.lua                   Target danger cues: SkullCount / IsOverLevel / RowText / ReactionColor (SPECS/13; copy of PlateStyle)
+  Core/Danger.lua                   Target danger cues: SkullCount / IsOverLevel / RowText / ReactionColor (SPECS/13; copy of PlateStyle). [mana] tokens + druid mana bar: SPECS/14
   Core/TextLayout.lua               element grid flow engine (lifted from PlateStyle Skin.LayoutTexts/ApplyTexts, parameterised by slot geometry)
   Core/Geometry.lua                 VFS.Geometry.Move/SetHeight — the one audited R2-exception helper (Era bar moves)
   Core/Textures.lua                 built-in bar textures/fonts; opportunistic LSM discovery (as PlateStyle)

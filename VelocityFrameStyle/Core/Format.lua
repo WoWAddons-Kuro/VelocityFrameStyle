@@ -17,6 +17,7 @@ Format.VALUE_FORMATS = { { "current", "Current" }, { "current_max", "Current / M
 Format.FORMAT_TOKENS = {
   health = { current = "[hp]", current_max = "[hp] / [hpmax]", percent = "[hp%]" },
   power = { current = "[power]", current_max = "[power] / [powermax]", percent = "[power%]" },
+  mana = { current = "[mana]", current_max = "[mana] / [manamax]", percent = "[mana%]" },   -- SPECS/14 druid forms
 }
 function Format.SetValueFormat(element, mode)
   local tokens = Format.FORMAT_TOKENS[element.id]
@@ -29,7 +30,8 @@ function Format.SampleValue(kind, mode)
   return values[mode] or values.current
 end
 
-Format.TOKENS = { "[name]", "[level]", "[hp]", "[hp%]", "[hpmax]", "[power]", "[power%]", "[powermax]", "[class]", "[class+]", "[creature]" }
+Format.TOKENS = { "[name]", "[level]", "[hp]", "[hp%]", "[hpmax]", "[power]", "[power%]", "[powermax]", "[mana]", "[mana%]", "[manamax]",
+  "[class]", "[class+]", "[creature]" }
 Format.SKULL_TEXT = "??"
 Format.SKULL_ICON = "|TInterface\\TargetingFrame\\UI-TargetingFrame-Skull:0|t"
 
@@ -98,6 +100,21 @@ local resolvers = {
     local v = Plain(UnitCreatureType(unit))
     return v or ""
   end,
+  -- Druid mana pool regardless of display power (SPECS/14). Plain-only: Forever's current mana is a secret and
+  -- these resolvers return "" for it; the Forever grid goes through Client.FormatBarValue("mana") instead.
+  ["[mana]"] = function(unit)
+    local cur = VFS.Client.ManaValues(unit)
+    return cur and Abbreviate(cur) or ""
+  end,
+  ["[manamax]"] = function(unit)
+    local _, max = VFS.Client.ManaValues(unit)
+    return max and Abbreviate(max) or ""
+  end,
+  ["[mana%]"] = function(unit)
+    local _, _, pct = VFS.Client.ManaValues(unit)
+    if not pct then return "" end
+    return tostring(math.floor(pct * 100 + 0.5)) .. "%"
+  end,
 }
 
 -- Expands `format` for `unit`. Unknown [tokens] are left as typed.
@@ -119,6 +136,7 @@ end
 -- True when the format reads health (refresh on UNIT_HEALTH) / power (refresh on UNIT_POWER_UPDATE).
 function Format.UsesHealth(format) return Has(format, "[hp]", "[hp%]", "[hpmax]") end
 function Format.UsesPower(format) return Has(format, "[power]", "[power%]", "[powermax]") end
+function Format.UsesMana(format) return Has(format, "[mana]", "[mana%]", "[manamax]") end
 
 -- Exactly one [name] token: the only case where a secret name may be handed straight to SetText.
 function Format.IsBareName(format) return format == "[name]" end

@@ -151,10 +151,15 @@ VFS.ClientFlavours.classic_era = {
   FormatBarValue = function(unit, kind, mode)
     local tokens = VFS.Format.FORMAT_TOKENS[kind]
     local text = VFS.Format.ExpandOrEmpty(tokens[mode] or tokens.current, unit)
-    local maximum = kind == "health" and UnitHealthMax(unit) or UnitPowerMax(unit)
-    if kind == "power" and maximum <= 0 then return "", false end
+    local maximum
+    if kind == "health" then maximum = UnitHealthMax(unit)
+    elseif kind == "mana" then maximum = UnitPowerMax(unit, Client.MANA_POWER_TYPE)   -- SPECS/14: the pool by type
+    else maximum = UnitPowerMax(unit) end
+    if kind ~= "health" and maximum <= 0 then return "", false end
     return text, text ~= ""
   end,
   PowerValues = Client.CommonPower,
+  ManaValues = Client.CommonMana,
+  ManaBarValues = Client.CommonManaBarValues,
   DifficultyColor = Client.CommonDifficultyColor,
 }
