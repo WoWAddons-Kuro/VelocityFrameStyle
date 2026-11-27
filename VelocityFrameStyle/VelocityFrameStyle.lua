@@ -331,6 +331,7 @@ local function Slash(msg)
   elseif msg == "pethappiness" or msg == "pethappy" then VFS.PetHappinessPanel.Dump()
   elseif msg == "editmode" or msg == "edit" then VFS.EditMode.Open()
   elseif msg == "restyle" then VFS.FrameBase.RestyleAll(); Util.Print("restyled")
+  elseif VFS.Frames and DB.Frame(msg) ~= nil and VFS.Options.OpenFrame then VFS.Options.OpenFrame(msg)   -- /vfs target -> that frame's page
   else VFS.Options.Open() end
 end
 

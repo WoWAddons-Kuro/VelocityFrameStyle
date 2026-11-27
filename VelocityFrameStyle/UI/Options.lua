@@ -1,16 +1,58 @@
--- Velocity Frame Style: the options page - ONE GotJunk/PlateStyle-style canvas under Settings > AddOns.
--- Sections: About, Theme (global defaults every frame inherits), one section per frame (UI\FramePage.lua),
--- Blizzard shortcuts, Reset. The spec's back-pocket sub-page tree would only change where BuildFrameSection draws.
+-- Velocity Frame Style: the options pages under Settings > AddOns. A ROOT canvas (About, Theme, Reset) plus one
+-- SUB-PAGE per frame (UI\FramePage.lua draws the section onto it) via Settings.RegisterCanvasLayoutSubcategory - the
+-- EasyFrames tree the owner asked for 2026-11-26 after the single page grew unwieldy. On clients without the Settings
+-- API every page is its own InterfaceOptions category, which the legacy panel nests under the root by .parent.
 local ADDON_NAME, VFS = ...
 local Util, Client, DB, Widgets, MediaPicker = VFS.Util, VFS.Client, VFS.DB, VFS.Widgets, VFS.MediaPicker
 
 local Options = {}
 VFS.Options = Options
 
-local page, category
+local page, category          -- root
+local pages = {}              -- every page (root + frame sub-pages): Refresh / banner / reload-on-close apply to all
+local subcategories = {}      -- [VFS_FrameID] = Settings category (for Options.OpenFrame)
 
 local function RestyleAll() VFS.FrameBase.RestyleAll() end
 local function Pct(v) return string.format("%d%%", math.floor(v * 100 + 0.5)) end
+
+-- Reload banner (owner 2026-11-26). Toggling "Use Velocity Frame Style" cannot be applied in place: hooks, the
+-- reparented portrait and stripped bar masks stay. The frame is left as-is, the user keeps twiddling, and this bar
+-- at the bottom of EVERY page does the /reload when they are done; closing Settings with it pending reloads too.
+local function AttachReloadBanner(p)
+  local banner = CreateFrame("Frame", nil, p)
+  banner:SetHeight(44); banner:SetPoint("BOTTOMLEFT", p, "BOTTOMLEFT", 0, 0); banner:SetPoint("BOTTOMRIGHT", p, "BOTTOMRIGHT", 0, 0)
+  banner:SetFrameLevel(p:GetFrameLevel() + 20)
+  local bg = banner:CreateTexture(nil, "BACKGROUND"); bg:SetAllPoints(); bg:SetColorTexture(0.6, 0.1, 0.1, 0.85)
+  local msg = banner:CreateFontString(nil, "OVERLAY", "GameFontHighlight"); msg:SetPoint("LEFT", 16, 0)
+  msg:SetText("A frame's styling was changed. The interface needs to reload for it to take effect.")
+  local btn = CreateFrame("Button", nil, banner, "UIPanelButtonTemplate"); btn:SetSize(120, 24); btn:SetPoint("RIGHT", -16, 0)
+  btn:SetText("Reload UI"); btn:SetScript("OnClick", function() ReloadUI() end)
+  banner:Hide()
+  p.reloadBanner = banner
+  -- OnHide fires when Settings closes AND when switching category; only the former reloads. Checked a frame later
+  -- because a category switch hides this page before the next one shows.
+  p:HookScript("OnHide", function()
+    if not Options.reloadNeeded then return end
+    C_Timer.After(0, function()
+      if Options.reloadNeeded and not (SettingsPanel and SettingsPanel:IsShown()) and not (InterfaceOptionsFrame and InterfaceOptionsFrame:IsShown()) then ReloadUI() end
+    end)
+  end)
+end
+
+local function RegisterPage(p, label, parentCategory)
+  pages[#pages + 1] = p
+  p:SetScript("OnShow", Options.Refresh)
+  AttachReloadBanner(p)
+  if Settings and Settings.RegisterCanvasLayoutCategory then
+    if parentCategory and Settings.RegisterCanvasLayoutSubcategory then return Settings.RegisterCanvasLayoutSubcategory(parentCategory, p, label) end
+    local cat = Settings.RegisterCanvasLayoutCategory(p, label)
+    Settings.RegisterAddOnCategory(cat)
+    return cat
+  elseif InterfaceOptions_AddCategory then
+    if parentCategory then p.parent = page.name end
+    InterfaceOptions_AddCategory(p)
+  end
+end
 
 function Options.Create()
   if page then return end
@@ -52,63 +94,46 @@ function Options.Create()
     function() return DB.Global().portraitStyle end, function(v) DB.Global().portraitStyle = v; RestyleAll() end), 20)
   theme:Finish(); page:Place(theme)
 
-  -- One section per frame
-  for _, id in ipairs(DB.FRAME_IDS) do
-    page:Place(VFS.FramePage.BuildFrameSection(content, id))
-  end
-
   -- Reset
   local reset = Widgets.Section(content, "Reset")
   reset:Add(Widgets.Button(reset, "Reset everything to defaults", function() DB.ResetAll(); RestyleAll(); Widgets.RefreshAll() end, 220), 22)
   reset:Finish(); page:Place(reset)
 
-  -- Reload banner (owner 2026-11-26). Turning "Use Velocity Frame Style" OFF cannot be undone in place: hooks, the
-  -- reparented portrait and stripped bar masks stay. The frame is left as-is, the user keeps twiddling, and this bar
-  -- at the bottom of the page does the /reload when they are done. Disabled frames are skipped at the next load.
-  local banner = CreateFrame("Frame", nil, page)
-  banner:SetHeight(44); banner:SetPoint("BOTTOMLEFT", page, "BOTTOMLEFT", 0, 0); banner:SetPoint("BOTTOMRIGHT", page, "BOTTOMRIGHT", 0, 0)
-  banner:SetFrameLevel(page:GetFrameLevel() + 20)
-  local bg = banner:CreateTexture(nil, "BACKGROUND"); bg:SetAllPoints(); bg:SetColorTexture(0.6, 0.1, 0.1, 0.85)
-  local msg = banner:CreateFontString(nil, "OVERLAY", "GameFontHighlight"); msg:SetPoint("LEFT", 16, 0)
-  msg:SetText("A frame's styling was turned off. The game needs to reload the interface to show Blizzard's frame again.")
-  local btn = CreateFrame("Button", nil, banner, "UIPanelButtonTemplate"); btn:SetSize(120, 24); btn:SetPoint("RIGHT", -16, 0)
-  btn:SetText("Reload UI"); btn:SetScript("OnClick", function() ReloadUI() end)
-  banner:Hide()
-  Options.reloadBanner = banner
+  category = RegisterPage(page, page.name)
 
-  page:SetScript("OnShow", Options.Refresh)
-  -- Closing the options window with a reload pending reloads then and there (owner 2026-11-26): the user is done twiddling.
-  -- OnHide fires when Settings closes AND when switching to another category, so the latter is not a trigger: only when the
-  -- whole Settings panel is gone (checked on the next frame, because category switches hide us before the new one shows).
-  page:HookScript("OnHide", function()
-    if not Options.reloadNeeded then return end
-    C_Timer.After(0, function()
-      if Options.reloadNeeded and not (SettingsPanel and SettingsPanel:IsShown()) and not (InterfaceOptionsFrame and InterfaceOptionsFrame:IsShown()) then ReloadUI() end
-    end)
-  end)
-  if Settings and Settings.RegisterCanvasLayoutCategory then
-    category = Settings.RegisterCanvasLayoutCategory(page, page.name)
-    Settings.RegisterAddOnCategory(category)
-  elseif InterfaceOptions_AddCategory then
-    InterfaceOptions_AddCategory(page)
+  -- One SUB-PAGE per frame
+  for _, id in ipairs(DB.FRAME_IDS) do
+    local label = VFS.FramePage.LABELS[id] or id
+    local sub = Widgets.Page("VelocityFrameStyleOptions_" .. id, label,
+      "Settings for the " .. label .. " frame. Theme values are inherited from the main Velocity Frame Style page unless overridden here.")
+    sub:Place(VFS.FramePage.BuildFrameSection(sub.content, id))
+    subcategories[id] = RegisterPage(sub, label, category)
   end
 end
 
 function Options.Refresh()
   if not page then return end
   Widgets.RefreshAll()
-  page:FitHeight()
-  if Options.reloadBanner then Options.reloadBanner:SetShown(Options.reloadNeeded == true) end
+  for _, p in ipairs(pages) do
+    p:FitHeight()
+    if p.reloadBanner then p.reloadBanner:SetShown(Options.reloadNeeded == true) end
+  end
 end
 
--- Called by FramePage when "Use Velocity Frame Style" is unticked on a frame that is currently styled.
+-- Called by FramePage when "Use Velocity Frame Style" changes on any frame.
 function Options.RequestReload()
   Options.reloadNeeded = true
-  if Options.reloadBanner then Options.reloadBanner:Show() end
+  for _, p in ipairs(pages) do if p.reloadBanner then p.reloadBanner:Show() end end
 end
 
 function Options.Open()
   if not page then return end
   if Settings and Settings.OpenToCategory and category then Settings.OpenToCategory(category:GetID())
   elseif InterfaceOptionsFrame_OpenToCategory then InterfaceOptionsFrame_OpenToCategory(page); InterfaceOptionsFrame_OpenToCategory(page) end
+end
+
+-- Open straight to one frame's sub-page (e.g. /vfs target)
+function Options.OpenFrame(id)
+  local cat = subcategories[id]
+  if cat and Settings and Settings.OpenToCategory then Settings.OpenToCategory(cat:GetID()) else Options.Open() end
 end
