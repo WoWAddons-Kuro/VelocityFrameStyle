@@ -2,7 +2,7 @@
 ## Title: Velocity Frame Style
 ## Notes: Restyles Blizzard's own unit frames (player, target, pet) with a simple text-element grid and bar styling, and adds the missing pet-target frame. Era + Forever.
 ## Author: Kuro
-## Version: @project-version@
+## Version: v2026.11.26.2028
 ## SavedVariables: VelocityFrameStyleDB
 ## OptionalDeps: LibStub, LibEditMode, LibSharedMedia-3.0
 ## IconTexture: Interface\AddOns\VelocityFrameStyle\Assets\VelocityFrameStyle_Icon.tga
