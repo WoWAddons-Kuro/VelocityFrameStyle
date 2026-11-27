@@ -6,12 +6,9 @@
 --
 -- Refresh: targettarget DOES fire UNIT_TARGET for unit "target" (unlike pettarget), so there is no poller; the
 -- bootstrap routes PLAYER_TARGET_CHANGED, UNIT_TARGET(target) and the targettarget UNIT_* events here.
---
--- Optional "hide when the target's target is me" (DB.Global().totHideWhenMe, default off): compares UnitGUIDs, which
--- are plain on both clients (UnitIsUnit may be secret on Forever). Cosmetic only - SetAlpha(0); Hide() is protected
--- in combat. Out of combat the hit rect is also collapsed so the invisible frame cannot eat clicks.
+-- The optional "hide when it is me" rule lives in OwnedUnitFrame (spec.hideWhenMeGlobalKey), shared with Focus Target.
 local ADDON_NAME, VFS = ...
-local Util, DB = VFS.Util, VFS.DB
+local DB = VFS.DB
 
 local ToT = {}
 VFS.ToT = ToT
@@ -20,8 +17,8 @@ ToT.SPEC = {
   id = "tot", unit = "targettarget", globalName = "VelocityFrameStyleToT",
   editModeLabel = "Target of Target", placementKey = "totPlacement",
   defaultPlacement = DB.DEFAULT_TOT_PLACEMENT, anchorFrameName = "TargetFrame",
-  flashGlobalKey = "totFlashOnNew", healthOnlyGlobalKey = "totHealthOnly",
-  small = { w = 93, h = 45, portrait = 35 },   -- Blizzard's Era TargetofTargetFrameTemplate footprint
+  flashGlobalKey = "totFlashOnNew", healthOnlyGlobalKey = "totHealthOnly", hideWhenMeGlobalKey = "totHideWhenMe",
+  small = { w = 93, h = 45, portrait = 35 },   -- Blizzard's Era TargetofTargetFrameTemplate footprint (button is re-fitted to the bars)
   needsPoller = false,
   sample = { name = "Target's Target", level = "60", health = "2.1K", healthpct = "88%", power = "1.2K", powerpct = "65%" },
   sampleIcon = "Interface\\Icons\\Ability_Warrior_Charge",
@@ -39,23 +36,6 @@ function ToT.Create()
   return owned.frame
 end
 
--- "On me" soft hide -------------------------------------------------------------------------------------
-local function IsOnMe()
-  local g = Util.Plain(UnitGUID("targettarget"))
-  return g ~= nil and g == Util.Plain(UnitGUID("player"))
-end
-
-local HIT_COLLAPSED = 10000
-local function ApplyOnMeRule()
-  local f = owned and owned.frame
-  if not f then return end
-  local hide = DB.Global().totHideWhenMe and not owned.sample and IsOnMe()
-  f:SetAlpha(hide and 0 or 1)
-  if not InCombatLockdown() then
-    if hide then f:SetHitRectInsets(HIT_COLLAPSED, HIT_COLLAPSED, HIT_COLLAPSED, HIT_COLLAPSED) else f:SetHitRectInsets(0, 0, 0, 0) end
-  end
-end
-
 -- Public surface ----------------------------------------------------------------------------------------
 function ToT.ApplyPlacement() return owned ~= nil and VFS.OwnedUnitFrame.ApplyPlacement(owned) end
 
@@ -68,9 +48,9 @@ function ToT.SetEnabled(on)
   else VFS.OwnedVisibility.DisableDriver("tot"); if not InCombatLockdown() then owned.frame:Hide() else VFS.OwnedVisibility.MarkPending("tot") end end
 end
 
-function ToT.Update() if owned then VFS.OwnedUnitFrame.Update(owned); ApplyOnMeRule() end end
-function ToT.OnTargetChanged() if owned then VFS.OwnedUnitFrame.OnUnitChanged(owned); ApplyOnMeRule() end end
-function ToT.SetSample(on) if owned then VFS.OwnedUnitFrame.SetSample(owned, on); ApplyOnMeRule() end end
+function ToT.Update() if owned then VFS.OwnedUnitFrame.Update(owned) end end
+function ToT.OnTargetChanged() if owned then VFS.OwnedUnitFrame.OnUnitChanged(owned); VFS.OwnedUnitFrame.ApplyHideWhenMe(owned) end end
+function ToT.SetSample(on) if owned then VFS.OwnedUnitFrame.SetSample(owned, on); VFS.OwnedUnitFrame.ApplyHideWhenMe(owned) end end
 function ToT.IsSample() return owned ~= nil and owned.sample end
 
 -- Called by the bootstrap for every event it routes to this frame.

@@ -10,6 +10,7 @@
 --   defaultPlacement = VFS_Placement,  anchorFrameName = the global the default placement anchors to ("PetFrame"),
 --   flashGlobalKey = DB.Global() boolean controlling the new-unit portrait pulse (nil = never),
 --   healthOnlyGlobalKey = DB.Global() boolean "only show health bar" (nil = never),
+--   hideWhenMeGlobalKey = DB.Global() boolean "soft-hide when the unit is the player" (nil = never),
 --   small         = nil | { w, h, portrait }  small frame (ToT): no classic art, portrait top-left, bars right,
 --   needsPoller   = bool (pettarget: no UNIT_* events of its own -> 0.2 s OnUpdate),
 --   sample        = text-sample values for Edit Mode,   sampleIcon = portrait texture in Edit Mode,
@@ -148,6 +149,10 @@ function OwnedUnitFrame.Create(spec)
   f.pulseAnim = f.pulse:CreateAnimationGroup()
   local a1 = f.pulseAnim:CreateAnimation("Alpha"); a1:SetFromAlpha(0); a1:SetToAlpha(1); a1:SetDuration(0.1); a1:SetOrder(1)
   local a2 = f.pulseAnim:CreateAnimation("Alpha"); a2:SetFromAlpha(1); a2:SetToAlpha(0); a2:SetDuration(0.5); a2:SetOrder(2)
+  -- Stop() mid-pulse leaves the texture at the interrupted alpha (owner, Forever 2026-11-26: a "doubled portrait" on
+  -- Focus Target was this ADD-blended mask frozen half-lit after two rapid unit changes). Always land on 0.
+  f.pulseAnim:SetScript("OnFinished", function() f.pulse:SetAlpha(0) end)
+  f.pulseAnim:SetScript("OnStop", function() f.pulse:SetAlpha(0) end)
 
   f:SetScript("OnEnter", function(self)
     if o.sample then return end
@@ -207,9 +212,17 @@ function OwnedUnitFrame.ApplyPlacement(o)
   if not f or InCombatLockdown() then return false end
   -- No zoom: dimensions change the bars; frame stays at its natural scale.
   local p = DB.Profile()[o.spec.placementKey]
-  local anchor = o.spec.anchorFrameName and _G[o.spec.anchorFrameName]
+  local anchorName = o.spec.anchorFrameName
+  local anchor = anchorName and _G[anchorName]
+  -- A saved record anchored to a frame other than the spec's (a renamed/retired anchor, e.g. Focus Target records from
+  -- before the owned Focus existed said "FocusFrame") is treated as "use the spec default", never the screen-centre
+  -- fallback - the user never chose that spot (owner, Forever 2026-11-26). nil anchorTo still means "dragged: UIParent".
+  if p.anchorTo and anchorName and p.anchorTo ~= anchorName then
+    local d = o.spec.defaultPlacement
+    p.anchorTo, p.point, p.relPoint, p.x, p.y = d.anchorTo, d.point, d.relPoint, d.x, d.y
+  end
   f:ClearAllPoints()
-  if p.anchorTo == o.spec.anchorFrameName and anchor then
+  if p.anchorTo == anchorName and anchor then
     f:SetPoint(p.point, anchor, p.relPoint, p.x, p.y)
   elseif p.anchorTo then
     local fb = DB.FALLBACK_PLACEMENT
@@ -280,6 +293,27 @@ function OwnedUnitFrame.Update(o)
   Util.Safe(tag .. "-bars", UpdateBars, o)
   Util.Safe(tag .. "-misc", UpdateMisc, o)
   FrameBase.ApplyTexts(o.state)
+  OwnedUnitFrame.ApplyHideWhenMe(o)
+end
+
+-- Optional "hide when the watched unit is me" (spec.hideWhenMeGlobalKey, e.g. totHideWhenMe; nil = never). Compares
+-- UnitGUIDs, which are plain on both clients (UnitIsUnit may be secret on Forever). Cosmetic only: SetAlpha(0) -
+-- Hide() is protected in combat. Out of combat the hit rect is also collapsed so the invisible frame cannot eat clicks.
+local HIT_COLLAPSED = 10000
+function OwnedUnitFrame.ApplyHideWhenMe(o)
+  local key, f = o.spec.hideWhenMeGlobalKey, o.frame
+  if not key or not f then return end
+  local hide = false
+  if G()[key] and not o.sample then
+    local g = Util.Plain(UnitGUID(o.spec.unit))
+    hide = g ~= nil and g == Util.Plain(UnitGUID("player"))
+  end
+  f:SetAlpha(hide and 0 or 1)
+  if not InCombatLockdown() then
+    if hide then f:SetHitRectInsets(HIT_COLLAPSED, HIT_COLLAPSED, HIT_COLLAPSED, HIT_COLLAPSED)
+    elseif o.spec.small then f:SetHitRectInsets(0, 0, 0, 0)
+    else f:SetHitRectInsets(96, 40, 10, 9) end
+  end
 end
 
 -- The watched unit may have changed (new GUID): refresh the portrait at once and pulse if the option is on.

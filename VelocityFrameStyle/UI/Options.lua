@@ -101,13 +101,23 @@ function Options.Create()
 
   category = RegisterPage(page, page.name)
 
-  -- One SUB-PAGE per frame
+  -- One SUB-PAGE per frame. Focus + Focus Target share ONE page (spec 12) and exist only where the client has a focus unit.
   for _, id in ipairs(DB.FRAME_IDS) do
-    local label = VFS.FramePage.LABELS[id] or id
-    local sub = Widgets.Page("VelocityFrameStyleOptions_" .. id, label,
-      "Settings for the " .. label .. " frame. Theme values are inherited from the main Velocity Frame Style page unless overridden here.")
-    sub:Place(VFS.FramePage.BuildFrameSection(sub.content, id))
-    subcategories[id] = RegisterPage(sub, label, category)
+    if id == "focus" then
+      if Client.HasFocusFrame() then
+        local sub = Widgets.Page("VelocityFrameStyleOptions_focus", "Focus and Focus Target",
+          "Settings for the Focus frame and its Focus Target. One switch styles both. Theme values are inherited from the main page unless overridden here.")
+        sub:Place(VFS.FramePage.BuildFocusSection(sub.content))
+        subcategories.focus = RegisterPage(sub, "Focus and Focus Target", category)
+        subcategories.focustarget = subcategories.focus
+      end
+    elseif id ~= "focustarget" then
+      local label = VFS.FramePage.LABELS[id] or id
+      local sub = Widgets.Page("VelocityFrameStyleOptions_" .. id, label,
+        "Settings for the " .. label .. " frame. Theme values are inherited from the main Velocity Frame Style page unless overridden here.")
+      sub:Place(VFS.FramePage.BuildFrameSection(sub.content, id))
+      subcategories[id] = RegisterPage(sub, label, category)
+    end
   end
 end
 

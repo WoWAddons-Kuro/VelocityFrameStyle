@@ -5,26 +5,33 @@ local ADDON_NAME, VFS = ...
 local Client, Util = VFS.Client, VFS.Util
 local P = Client.Path
 
-local UNITS = { player = "player", target = "target", pet = "pet", pettarget = "pettarget", tot = "targettarget" }
+local UNITS = { player = "player", target = "target", pet = "pet", pettarget = "pettarget", tot = "targettarget",
+  focus = "focus", focustarget = "focustarget" }
 
--- pettarget and tot are OUR frames (Frames\OwnedUnitFrame.lua, spec 11); every region resolver returns their regions.
+-- pettarget, tot, focus and focustarget are OUR frames (Frames\OwnedUnitFrame.lua, specs 11/12); every resolver returns
+-- their regions. Focus is owned, NOT a restyle of Blizzard's FocusFrame (spec 12 "why owned"): FocusFrame is suppressed whole.
 local function Owned(id)
   local o = VFS.OwnedUnitFrame and VFS.OwnedUnitFrame.Get(id)
   return o and o.frame
 end
-local function IsOwned(id) return id == "pettarget" or id == "tot" end
+local OWNED = { pettarget = true, tot = true, focus = true, focustarget = true }
+local function IsOwned(id) return OWNED[id] == true end
+
+local function TargetLike(id) if id == "target" then return TargetFrame end end
 
 local function Root(id)
   if id == "player" then return PlayerFrame
-  elseif id == "target" then return TargetFrame
   elseif id == "pet" then return PetFrame
-  elseif IsOwned(id) then return Owned(id) end
+  elseif IsOwned(id) then return Owned(id)
+  else return TargetLike(id) end
 end
 
 -- Mainline containers
 local function PlayerMain() return P(PlayerFrame, "PlayerFrameContent.PlayerFrameContentMain") end
-local function TargetMain() return P(TargetFrame, "TargetFrameContent.TargetFrameContentMain") end
-local function TargetContextual() return P(TargetFrame, "TargetFrameContent.TargetFrameContentContextual") end
+local function TargetMain(id) return P(TargetLike(id), "TargetFrameContent.TargetFrameContentMain") end
+local function TargetContextual(id) return P(TargetLike(id), "TargetFrameContent.TargetFrameContentContextual") end
+-- Blizzard's ToT child of Target and the owned id that replaces it
+local function BlizzToT(id) if id == "target" then return TargetFrameToT, "tot" end end
 
 local function List(...)
   local out = {}
@@ -69,13 +76,13 @@ VFS.ClientFlavours.forever = {
 
   HealthBar = function(id)
     if id == "player" then return P(PlayerMain(), "HealthBarsContainer.HealthBar")
-    elseif id == "target" then return P(TargetMain(), "HealthBarsContainer.HealthBar")
+    elseif TargetLike(id) then return P(TargetMain(id), "HealthBarsContainer.HealthBar")
     elseif id == "pet" then return PetFrameHealthBar
     elseif IsOwned(id) then local f = Root(id); return f and f.health end
   end,
   PowerBar = function(id)
     if id == "player" then return P(PlayerMain(), "ManaBarArea.ManaBar")
-    elseif id == "target" then return P(TargetMain(), "ManaBar")
+    elseif TargetLike(id) then return P(TargetMain(id), "ManaBar")
     elseif id == "pet" then return PetFrameManaBar
     elseif IsOwned(id) then local f = Root(id); return f and f.power end
   end,
@@ -91,20 +98,30 @@ VFS.ClientFlavours.forever = {
         hc and hc.Background, hc and hc.HealthBar and hc.HealthBar.Background,
         hc and hc.PlayerFrameTempMaxHealthLoss, hc and hc.PlayerFrameHealthBarAnimatedLoss,
         P(PlayerFrame, "PlayerFrameContent.PlayerFrameContentContextual.PlayerPortraitCornerIcon"))
-    elseif id == "target" then
-      local c, m = P(TargetFrame, "TargetFrameContainer"), TargetMain()
+    elseif TargetLike(id) then
+      local c, m = P(TargetLike(id), "TargetFrameContainer"), TargetMain(id)
       local hc = P(m, "HealthBarsContainer")
       local out = List(c and c.FrameTexture, c and c.Flash, c and c.BossPortraitFrameTexture,
         m and m.ReputationColor, m and m.LevelBackgroundCircle,
         hc and hc.Background, hc and hc.HealthBar and hc.HealthBar.Background, hc and hc.TempMaxHealthLoss)
-      -- Blizzard's ToT is only chrome while OUR ToT replaces it; with "Use Velocity Frame Style" off for tot, it must draw.
-      local t = TargetFrameToT
-      if t and VFS.DB.Frame("tot").enabled then
-        for _, r in ipairs(List(t.FrameTexture, t.Portrait, t.Name, t.DeadText, t.HealthBar, t.ManaBar, t.Debuff1, t.Debuff2, t.Debuff3, t.Debuff4)) do out[#out + 1] = r end
+      -- Blizzard's ToT child (TargetFrameToT / FocusFrameToT) is only chrome while OUR owned frame replaces it; with
+      -- "Use Velocity Frame Style" off for that owned id, it must draw. Suppress the FRAME, not its textures: Blizzard
+      -- keeps the frame shown and SetPortraitTexture (C side) repaints .Portrait at alpha 1 past any texture hook
+      -- (owner, Forever 2026-11-26: FocusFrameToT:SetAlpha(0) killed the "double portrait"; .FrameTexture at 0 had not).
+      -- Frame alpha is cosmetic and unprotected; Hide() would be protected and re-shown by Blizzard's Update.
+      local t, ownedId = BlizzToT(id)
+      if t and VFS.DB.Frame(ownedId).enabled then
+        out[#out + 1] = t
       end
       return out
     elseif id == "pet" then
       return List(PetFrameTexture, PetFrameFlash, PetAttackModeTexture)
+    elseif id == "focus" then
+      -- Owned Focus (spec 12): Blizzard's FocusFrame is ONE chrome region, suppressed whole - frame alpha 0 cascades to
+      -- every child incl. FocusFrameToT and holds (owner experiment 2026-11-26); a restyle failed because
+      -- FocusFrameMixin:SetSmallSize rescales/re-anchors it. Never Hide() FocusFrame: protected and an Edit Mode system.
+      local f = Root(id)
+      return List(FocusFrame, f and f.texture, f and f.nameBackground)
     elseif IsOwned(id) then
       local f = Root(id); return List(f and f.texture, f and f.nameBackground)
     end
@@ -115,8 +132,8 @@ VFS.ClientFlavours.forever = {
     if id == "player" then
       local x = P(PlayerFrame, "PlayerFrameContent.PlayerFrameContentContextual")
       return List(x and x.PlayerRestLoop, x and x.AttackIcon)
-    elseif id == "target" then
-      local x = TargetContextual()
+    elseif TargetLike(id) then
+      local x = TargetContextual(id)
       return List(x and x.HighLevelTexture, x and x.BossIcon)
     elseif id == "pet" then
       return List(VFS.Client.PetHappinessFrame())
@@ -124,7 +141,7 @@ VFS.ClientFlavours.forever = {
     return {}
   end,
   ClassificationIcon = function(id)
-    if id == "target" then return P(TargetContextual(), "HighLevelTexture") end
+    if TargetLike(id) then return P(TargetContextual(id), "HighLevelTexture") end
     if IsOwned(id) then local f = Root(id); return f and f.skull end
   end,
   -- Forever (Camelot) keeps hunter-pet happiness and loyalty (owner screenshot 2026-11-26: "Happy - 125% damage -
@@ -149,38 +166,38 @@ VFS.ClientFlavours.forever = {
   end,
   Portrait = function(id)
     if id == "player" then return P(PlayerFrame, "PlayerFrameContainer.PlayerPortrait")
-    elseif id == "target" then return P(TargetFrame, "TargetFrameContainer.Portrait")
+    elseif TargetLike(id) then return P(TargetLike(id), "TargetFrameContainer.Portrait")
     elseif id == "pet" then return PetPortrait
     elseif IsOwned(id) then local f = Root(id); return f and f.portrait end
   end,
   NameText = function(id)
     if id == "player" then return PlayerName
-    elseif id == "target" then return P(TargetMain(), "Name")
+    elseif TargetLike(id) then return P(TargetMain(id), "Name")
     elseif id == "pet" then return PetName
     elseif IsOwned(id) then local f = Root(id); return f and f.name end
   end,
   HealthTexts = function(id)
     if id == "player" then local c = P(PlayerMain(), "HealthBarsContainer"); return List(c and c.HealthBarText, c and c.LeftText, c and c.RightText)
-    elseif id == "target" then local c = P(TargetMain(), "HealthBarsContainer"); return List(c and c.HealthBarText, c and c.LeftText, c and c.RightText, c and c.DeadText)
+    elseif TargetLike(id) then local c = P(TargetMain(id), "HealthBarsContainer"); return List(c and c.HealthBarText, c and c.LeftText, c and c.RightText, c and c.DeadText)
     elseif id == "pet" then return List(PetFrameHealthBarText, PetFrameHealthBarTextLeft, PetFrameHealthBarTextRight)
     elseif IsOwned(id) then local f = Root(id); return List(f and f.healthText, f and f.deadText) end
     return {}
   end,
   PowerTexts = function(id)
     if id == "player" then local m = P(PlayerMain(), "ManaBarArea.ManaBar"); return List(m and m.ManaBarText, m and m.LeftText, m and m.RightText)
-    elseif id == "target" then local m = P(TargetMain(), "ManaBar"); return List(m and m.ManaBarText, m and m.LeftText, m and m.RightText)
+    elseif TargetLike(id) then local m = P(TargetMain(id), "ManaBar"); return List(m and m.ManaBarText, m and m.LeftText, m and m.RightText)
     elseif id == "pet" then return List(PetFrameManaBarText, PetFrameManaBarTextLeft, PetFrameManaBarTextRight)
     elseif IsOwned(id) then local f = Root(id); return List(f and f.powerText) end
     return {}
   end,
   StockLevelRegions = function(id)
     if id == "player" then return List(PlayerLevelText)
-    elseif id == "target" then return List(P(TargetMain(), "LevelText"), P(TargetMain(), "LevelBackgroundCircle"))
+    elseif TargetLike(id) then return List(P(TargetMain(id), "LevelText"), P(TargetMain(id), "LevelBackgroundCircle"))
     elseif IsOwned(id) then local f = Root(id); return List(f and f.level) end
     return {}   -- pet: Blizzard has no level region
   end,
   NameBackground = function(id)
-    if id == "target" then return P(TargetMain(), "ReputationColor")
+    if TargetLike(id) then return P(TargetMain(id), "ReputationColor")
     elseif IsOwned(id) then local f = Root(id); return f and f.nameBackground end
   end,
   -- Geometric chrome (spec): the stock bars are ours to size and anchor on Forever too. SetHeight/SetPoint on the
@@ -199,9 +216,9 @@ VFS.ClientFlavours.forever = {
   -- so we never read it - we re-anchor and re-font the string itself (R5 coping pattern from PlateStyle).
   StockValueText = function(id, kind)
     if id == "player" then return kind == "health" and P(PlayerMain(), "HealthBarsContainer.HealthBarText") or P(PlayerMain(), "ManaBarArea.ManaBar.ManaBarText") end
-    if id == "target" then return kind == "health" and P(TargetMain(), "HealthBarsContainer.HealthBarText") or P(TargetMain(), "ManaBar.ManaBarText") end
+    if TargetLike(id) then return kind == "health" and P(TargetMain(id), "HealthBarsContainer.HealthBarText") or P(TargetMain(id), "ManaBar.ManaBarText") end
     if id == "pet" then return kind == "health" and PetFrameHealthBarText or PetFrameManaBarText end
-    return nil   -- owned frames (pettarget, tot): values are ours
+    return nil   -- owned frames (pettarget, tot, focustarget): values are ours
   end,
   HasPowerResource = function(unit)
     local powerType = Util.PlainNumber(UnitPowerType(unit), nil)

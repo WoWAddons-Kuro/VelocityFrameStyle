@@ -60,11 +60,9 @@ VFS.ClientFlavours.classic_era = {
     elseif id == "target" then
       local out = List(TargetFrameTextureFrameTexture, TargetFrameFlash, TargetFrameNameBackground, TargetFrameBackground)
       -- Blizzard's ToT is only chrome while OUR ToT replaces it; with "Use Velocity Frame Style" off for tot, it must draw.
-      if VFS.DB.Frame("tot").enabled then
-        for _, r in ipairs(List(TargetFrameToTTextureFrameTexture, TargetFrameToTBackground, TargetFrameToTPortrait, TargetFrameToTHealthBar,
-          TargetFrameToTManaBar, TargetFrameToTTextureFrameName, TargetFrameToTTextureFrameDeadText, TargetFrameToTTextureFrameUnconsciousText,
-          TargetFrameToTDebuff1, TargetFrameToTDebuff2, TargetFrameToTDebuff3, TargetFrameToTDebuff4)) do out[#out + 1] = r end
-      end
+      -- The FRAME is the chrome region (alpha 0, cosmetic, unprotected), not its textures: SetPortraitTexture repaints
+      -- the portrait at alpha 1 past any texture hook (Forever finding 2026-11-26; same template on Era).
+      if TargetFrameToT and VFS.DB.Frame("tot").enabled then out[#out + 1] = TargetFrameToT end
       return out
     elseif id == "pet" then return List(PetFrameTexture, PetFrameFlash, PetAttackModeTexture)
     elseif IsOwned(id) then local f = Root(id); return List(f and f.texture, f and f.nameBackground) end

@@ -7,7 +7,7 @@ VelocityFrameStyleDB = {version=2, flatBarSurfaces=true, frames={player={
   enabled=true, dimensions={barWidth=220}, elements={{id='health',valueFormat='percent',format='[hp%]'}}
 }}}
 ns.DB.Init()
-for _, id in ipairs({'player','target','pet','pettarget','tot'}) do
+for _, id in ipairs({'player','target','pet','pettarget','tot','focus','focustarget'}) do
   assert(ns.DB.Frame(id) and ns.DB.Frame(id).enabled ~= nil, 'missing settings: '..id)
   assert(type(ns.DB.Elements(id))=='table', 'missing elements: '..id)
   assert(ns.Chrome.LAYOUT[id], 'missing geometry: '..id)

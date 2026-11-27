@@ -51,5 +51,6 @@ Detail lives in the numbered specs (07 review, 08 Era plan, 06 atlas). Started 2
 - [ ] Rim width exactly = bar border (4 units): generator `rimInner` 54 → 55.4, or a per-portrait-size rim atlas
 - [ ] Soft glow atlas variant with a wider/looser falloff selectable per theme
 - [ ] Pixel-snap badge and rim positions at non-integer UI scales (PixelUtil) so 1px seams never appear
+- [ ] **Border reads fat on Forever (owner 2026-11-26).** Code is one value on both clients (`BAR_BORDER_WIDTH = 4`, atlas dispatch by thickness), so suspect UI-unit vs pixel scale (`uiScale` / `UIParent:GetEffectiveScale()` differs per install) or a stuck combat glow ring (+2 units). Pixel-snapping the border width (PixelUtil) would make it uniform.
 - [ ] Badge text auto-size: shrink the level font one step when the number is wider than the badge disc
 - [ ] Combat glow colour per frame override (currently global `combatGlowColor` only)

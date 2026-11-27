@@ -27,6 +27,9 @@ Chrome.LAYOUT = {
   pet       = { health = { w = 70,  h = 10 }, power = { w = 70,  h = 7 },  nameRow = 11, platePad = 3, discPad = 3, plateOverlap = 1.0, side = "right" },
   tot       = { health = { w = 70,  h = 10 }, power = { w = 70,  h = 7 },  nameRow = 11, platePad = 3, discPad = 3, plateOverlap = 1.0, side = "right" },
   pettarget = { health = { w = 113, h = 24 }, power = { w = 113, h = 12 }, nameRow = 12, platePad = 4, discPad = 5, plateOverlap = 1.0, side = "left" },
+  -- Focus is a Target clone (spec 12); Focus Target is a ToT clone.
+  focus       = { health = { w = 113, h = 24 }, power = { w = 113, h = 12 }, nameRow = 12, platePad = 4, discPad = 5, plateOverlap = 1.0, side = "left" },
+  focustarget = { health = { w = 70,  h = 10 }, power = { w = 70,  h = 7 },  nameRow = 11, platePad = 3, discPad = 3, plateOverlap = 1.0, side = "right" },
 }
 -- side = which side of the portrait the bars sit on: "right" (player/pet: portrait left) | "left" (target: portrait right)
 

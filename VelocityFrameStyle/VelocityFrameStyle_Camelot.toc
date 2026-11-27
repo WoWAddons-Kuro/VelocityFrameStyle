@@ -37,6 +37,8 @@ Frames\Pet.lua
 Frames\ToT.lua
 Frames\OwnedUnitFrame.lua
 Frames\PetTarget.lua
+Frames\Focus.lua
+Frames\FocusTarget.lua
 Frames\OwnedVisibility.lua
 Frames\PetHappinessPanel.lua
 

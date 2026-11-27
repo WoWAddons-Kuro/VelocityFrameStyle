@@ -373,6 +373,18 @@ local function OnEvent(_, event, arg1, arg2)
         Stage("ToTVisibility", function() VFS.OwnedVisibility.Register(VFS.ToT.owned) end)
         Stage("ToTPlacement", function() if not VFS.ToT.ApplyPlacement() then VFS.OwnedVisibility.MarkPending("tot") end end)
       end
+      -- Owned Focus + owned Focus Target (spec 12): Forever only (Client.HasFocusFrame); ONE "Use Velocity Frame Style"
+      -- flag drives both records (the options page writes both). Blizzard's FocusFrame is suppressed whole as Focus chrome.
+      if Client.HasFocusFrame() and Styled("focus") then
+        Stage("Focus", VFS.Focus.Create)
+        Stage("FocusVisibility", function() VFS.OwnedVisibility.Register(VFS.Focus.owned) end)
+        Stage("FocusPlacement", function() if not VFS.Focus.ApplyPlacement() then VFS.OwnedVisibility.MarkPending("focus") end end)
+        if Styled("focustarget") then
+          Stage("FocusTarget", VFS.FocusTarget.Create)
+          Stage("FocusTargetVisibility", function() VFS.OwnedVisibility.Register(VFS.FocusTarget.owned) end)
+          Stage("FocusTargetPlacement", function() if not VFS.FocusTarget.ApplyPlacement() then VFS.OwnedVisibility.MarkPending("focustarget") end end)
+        end
+      end
       -- Era hunter pets only; Setup is a no-op where Client.PetHappinessFrame() is nil (Forever).
       Stage("PetHappinessPanel", VFS.PetHappinessPanel.Setup)
     end
@@ -387,28 +399,29 @@ local function OnEvent(_, event, arg1, arg2)
     Stage("EditMode", VFS.EditMode.Setup)
     if VFS.PetTarget.frame then Stage("PetTargetDriver", VFS.PetTargetVisibility.EnableDriver) end
     if VFS.ToT.frame and VFS.ToT.IsEnabled() then Stage("ToTDriver", function() VFS.OwnedVisibility.EnableDriver("tot") end) end
+    if VFS.Focus.frame then Stage("FocusDriver", function() VFS.OwnedVisibility.EnableDriver("focus") end) end
+    if VFS.FocusTarget.frame then Stage("FocusTargetDriver", function() VFS.OwnedVisibility.EnableDriver("focustarget") end) end
     Stage("Options", VFS.Options.Create)
     f:RegisterEvent("PLAYER_REGEN_ENABLED")
     f:RegisterEvent("PLAYER_REGEN_DISABLED")
     f:RegisterEvent("PLAYER_TARGET_CHANGED")
+    if Client.HasFocusFrame() then f:RegisterEvent("PLAYER_FOCUS_CHANGED") end
     f:RegisterEvent("PLAYER_ENTERING_WORLD")
     f:RegisterEvent("PLAYER_LEVEL_UP")
     f:RegisterEvent("RAID_TARGET_UPDATE")
     f:RegisterEvent("ADDON_ACTION_BLOCKED")
     f:RegisterEvent("ADDON_ACTION_FORBIDDEN")
-    f:RegisterUnitEvent("UNIT_TARGET", "pet", "target")
+    f:RegisterUnitEvent("UNIT_TARGET", "pet", "target", "focus")
     f:RegisterUnitEvent("UNIT_PET", "player")
-    f:RegisterUnitEvent("UNIT_LEVEL", "player", "target", "pet", "pettarget", "targettarget")
-    f:RegisterUnitEvent("UNIT_NAME_UPDATE", "player", "target", "pet", "pettarget", "targettarget")
-    f:RegisterUnitEvent("UNIT_FACTION", "target", "pettarget", "targettarget")
-    f:RegisterUnitEvent("UNIT_FLAGS", "player", "target", "pet", "pettarget", "targettarget")   -- in-combat flag -> our glow
-    f:RegisterUnitEvent("UNIT_CLASSIFICATION_CHANGED", "target", "pettarget", "targettarget")
-    -- owned ToT value events (pettarget fires none and polls instead)
-    f:RegisterUnitEvent("UNIT_HEALTH", "targettarget")
-    f:RegisterUnitEvent("UNIT_MAXHEALTH", "targettarget")
-    f:RegisterUnitEvent("UNIT_POWER_UPDATE", "targettarget")
-    f:RegisterUnitEvent("UNIT_MAXPOWER", "targettarget")
-    f:RegisterUnitEvent("UNIT_DISPLAYPOWER", "targettarget")
+    f:RegisterUnitEvent("UNIT_LEVEL", "player", "target", "pet", "pettarget", "targettarget", "focus", "focustarget")
+    f:RegisterUnitEvent("UNIT_NAME_UPDATE", "player", "target", "pet", "pettarget", "targettarget", "focus", "focustarget")
+    f:RegisterUnitEvent("UNIT_FACTION", "target", "pettarget", "targettarget", "focus", "focustarget")
+    f:RegisterUnitEvent("UNIT_FLAGS", "player", "target", "pet", "pettarget", "targettarget", "focus", "focustarget")   -- in-combat flag -> our glow
+    f:RegisterUnitEvent("UNIT_CLASSIFICATION_CHANGED", "target", "pettarget", "targettarget", "focus", "focustarget")
+    -- owned event-driven units' value events (pettarget fires none and polls instead)
+    for _, ev in ipairs({ "UNIT_HEALTH", "UNIT_MAXHEALTH", "UNIT_POWER_UPDATE", "UNIT_MAXPOWER", "UNIT_DISPLAYPOWER" }) do
+      f:RegisterUnitEvent(ev, "targettarget", "focus", "focustarget")
+    end
     Util.Print("loaded (%s). /vfs for options, /vfs status for details", Client.flavour)
   elseif event == "ADDON_ACTION_BLOCKED" or event == "ADDON_ACTION_FORBIDDEN" then
     if arg1 == ADDON_NAME then
@@ -422,26 +435,36 @@ local function OnEvent(_, event, arg1, arg2)
     -- our combat glow follows the player's combat state on every frame we style
     for _, st in pairs(VFS.Frames) do VFS.FrameBase.OnCombatChanged(st) end
     if VFS.ToT.frame then VFS.ToT.OnEvent(event) end
+    if VFS.Focus.frame then VFS.Focus.OnEvent(event) end
+    if VFS.FocusTarget.frame then VFS.FocusTarget.OnEvent(event) end
   elseif event == "PLAYER_REGEN_DISABLED" then
     for _, st in pairs(VFS.Frames) do VFS.FrameBase.OnCombatChanged(st) end
   elseif event == "UNIT_TARGET" then
     if arg1 == "pet" and VFS.PetTarget.frame then VFS.PetTarget.OnPetTargetChanged() end
     if arg1 == "target" and VFS.ToT.frame then VFS.ToT.OnEvent(event, arg1) end
+    if arg1 == "focus" and VFS.FocusTarget.frame then VFS.FocusTarget.OnEvent(event, arg1) end
   elseif event == "UNIT_PET" then
     if VFS.PetTarget.frame then VFS.PetTarget.OnPetTargetChanged() end
     if VFS.Frames.pet then VFS.Pet.OnEvent(event, arg1) end
   elseif event == "PLAYER_TARGET_CHANGED" then
     if VFS.Frames.target then VFS.Target.OnEvent(event) end
     if VFS.ToT.frame then VFS.ToT.OnEvent(event) end
+  elseif event == "PLAYER_FOCUS_CHANGED" then
+    if VFS.Focus.frame then VFS.Focus.OnEvent(event) end
+    if VFS.FocusTarget.frame then VFS.FocusTarget.OnEvent(event) end
   elseif event == "UNIT_HEALTH" or event == "UNIT_MAXHEALTH" or event == "UNIT_POWER_UPDATE" or event == "UNIT_MAXPOWER" or event == "UNIT_DISPLAYPOWER" then
-    -- registered for targettarget only: the owned ToT has no poller (pettarget does, it fires no events)
-    if VFS.ToT.frame then VFS.ToT.OnEvent(event, arg1) end
+    -- registered for the owned event-driven units only (pettarget fires none and polls instead)
+    if arg1 == "targettarget" and VFS.ToT.frame then VFS.ToT.OnEvent(event, arg1) end
+    if arg1 == "focus" and VFS.Focus.frame then VFS.Focus.OnEvent(event, arg1) end
+    if arg1 == "focustarget" and VFS.FocusTarget.frame then VFS.FocusTarget.OnEvent(event, arg1) end
   else
     if VFS.Frames.player then VFS.Player.OnEvent(event, arg1) end
     if VFS.Frames.target then VFS.Target.OnEvent(event, arg1) end
     if VFS.Frames.pet then VFS.Pet.OnEvent(event, arg1) end
+    if VFS.Focus.frame and (arg1 == "focus" or event == "PLAYER_ENTERING_WORLD" or event == "RAID_TARGET_UPDATE") then VFS.Focus.OnEvent(event, arg1) end
     if VFS.PetTarget.frame and (arg1 == "pettarget" or event == "PLAYER_ENTERING_WORLD" or event == "RAID_TARGET_UPDATE") then VFS.PetTarget.Update() end
     if VFS.ToT.frame and (arg1 == "targettarget" or event == "PLAYER_ENTERING_WORLD" or event == "RAID_TARGET_UPDATE") then VFS.ToT.OnEvent(event, arg1) end
+    if VFS.FocusTarget.frame and (arg1 == "focustarget" or event == "PLAYER_ENTERING_WORLD" or event == "RAID_TARGET_UPDATE") then VFS.FocusTarget.OnEvent(event, arg1) end
   end
 end
 

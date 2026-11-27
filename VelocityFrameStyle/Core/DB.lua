@@ -50,6 +50,11 @@ DB.DEFAULT_GLOBAL = {
   totHealthOnly = true,
   totFlashOnNew = true,
   totHideWhenMe = false,          -- soft-hide (alpha 0) when the target's target is the player; GUID compare
+  -- focus target extras (spec 12): same trio; no master switch - Focus Target exists whenever Focus does
+  focusTargetHealthOnly = true,
+  focusTargetFlashOnNew = true,
+  focusTargetHideWhenMe = false,
+  focusFlashOnNew = true,         -- owned Focus: portrait pulse on a new focus
   -- Era hunter pets: hover panel on the happiness icon / pet level badge (SPECS/10)
   petHappinessPanel = true,
   petHappinessPanelShiftOnly = false,   -- show the panel only while Shift is held
@@ -64,7 +69,9 @@ local function DefaultFrame()
   }
 end
 
-DB.FRAME_IDS = { "player", "target", "pet", "pettarget", "tot" }   -- every frame module needs a settings record
+-- Every frame module needs a settings record. focus/focustarget records exist on every client; the frames only exist
+-- where Client.HasFocusFrame() (Forever; Era has no focus unit) - SPECS/12_Focus_Frame.md.
+DB.FRAME_IDS = { "player", "target", "pet", "pettarget", "tot", "focus", "focustarget" }
 
 -- VFS_Placement for the pet-target frame (anchorTo = "PetFrame" is the un-moved default; LibEditMode clears it)
 DB.DEFAULT_PLACEMENT = { anchorTo = "PetFrame", point = "LEFT", relPoint = "RIGHT", x = 8, y = 0 }
@@ -72,7 +79,13 @@ DB.FALLBACK_PLACEMENT = { point = "CENTER", x = 220, y = -40 }
 -- VFS_Placement for our Target-of-Target frame (spec 11): where Blizzard's own ToT sits - its BOTTOMRIGHT at TargetFrame's
 -- BOTTOMRIGHT (-16, -14) on Era's TargetofTargetFrameTemplate. The same anchor is used on Forever for v1 (owner: tune in test).
 DB.DEFAULT_TOT_PLACEMENT = { anchorTo = "TargetFrame", point = "BOTTOMRIGHT", relPoint = "BOTTOMRIGHT", x = -16, y = -14 }
-DB.DEFAULT_PROFILE = { petTargetPlacement = DB.DEFAULT_PLACEMENT, totPlacement = DB.DEFAULT_TOT_PLACEMENT }   -- VFS_ProfileRecord
+-- Owned Focus (spec 12): sits over Blizzard's (suppressed) FocusFrame so Edit Mode moves of the Blizzard entry still mean
+-- something until the user drags OUR "Focus" entry. Our frame is 232x100 like Pet Target; FocusFrame is 232x100 too.
+DB.DEFAULT_FOCUS_PLACEMENT = { anchorTo = "FocusFrame", point = "TOPLEFT", relPoint = "TOPLEFT", x = 0, y = 0 }
+-- Focus Target (spec 12): Blizzard's relative ToT spot, but anchored to OUR Focus frame so it follows a drag.
+DB.DEFAULT_FOCUSTARGET_PLACEMENT = { anchorTo = "VelocityFrameStyleFocus", point = "TOPRIGHT", relPoint = "BOTTOMRIGHT", x = 12, y = 10 }
+DB.DEFAULT_PROFILE = { petTargetPlacement = DB.DEFAULT_PLACEMENT, totPlacement = DB.DEFAULT_TOT_PLACEMENT,
+  focusPlacement = DB.DEFAULT_FOCUS_PLACEMENT, focusTargetPlacement = DB.DEFAULT_FOCUSTARGET_PLACEMENT }   -- VFS_ProfileRecord
 
 function DB.Init()
   VelocityFrameStyleDB = type(VelocityFrameStyleDB) == "table" and VelocityFrameStyleDB or {}
@@ -185,6 +198,12 @@ function DB.Profile()
   end
   if type(p.totPlacement) ~= "table" then
     p.totPlacement = Util.DeepCopy(DB.DEFAULT_TOT_PLACEMENT)
+  end
+  if type(p.focusPlacement) ~= "table" then
+    p.focusPlacement = Util.DeepCopy(DB.DEFAULT_FOCUS_PLACEMENT)
+  end
+  if type(p.focusTargetPlacement) ~= "table" then
+    p.focusTargetPlacement = Util.DeepCopy(DB.DEFAULT_FOCUSTARGET_PLACEMENT)
   end
   return p
 end
