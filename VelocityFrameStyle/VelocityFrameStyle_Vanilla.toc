@@ -23,12 +23,15 @@ Core\DB.lua
 Core\LayoutProfile.lua
 Core\Textures.lua
 Core\Format.lua
+Core\Danger.lua
 Core\TextLayout.lua
 Core\Geometry.lua
 Core\PetHappiness.lua
 
 Assets\RoundedBorderAtlas.lua
 Frames\RoundedBorder.lua
+Templates.xml
+Frames\DangerCue.lua
 Frames\FrameBase.lua
 Frames\Chrome.lua
 Frames\Player.lua

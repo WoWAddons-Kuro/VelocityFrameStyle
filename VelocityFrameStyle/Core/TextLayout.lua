@@ -68,6 +68,10 @@ function TextLayout.ColorFor(e, unit, stockFS)
   elseif mode == "difficulty" then
     local level = Util.PlainNumber(UnitLevel(unit), nil)
     if level == nil or level < 0 then return 1, 0.1, 0.1 end
+    -- Target danger cue (SPECS/13): at the user's over-level threshold / skull count the number reads skull-red.
+    if unit == "target" and VFS.Danger and VFS.Danger.IsDangerous(unit) then
+      local c = VFS.Danger.RED; return c[1], c[2], c[3]
+    end
     -- Our own pet (owner, Era 2026-11-26): the enemy difficulty scale is the wrong message for a pet. A pet that
     -- has fallen behind is a PROBLEM, so: yellow at the player's level or one below, red any further behind,
     -- never green or grey. Pets can't out-level the player; treat >= as "caught up" (yellow).

@@ -179,6 +179,28 @@ end
 
 -- Frame extras (per-id odds and ends)
 function FramePage.AddFrameExtras(box, id)
+  if id == "target" then
+    -- Danger Highlight (SPECS/13): port of VelocityPlateStyle's Hardcore cues. Account-wide, Target only.
+    local hdr = box:CreateFontString(nil, "ARTWORK", "GameFontNormal"); hdr:SetText("Danger Highlight (Hardcore)")
+    box:Add(hdr, 14, -10)
+    local function ApplyDanger() Restyle("target"); if VFS.Target and VFS.Target.ApplyDanger then VFS.Target.ApplyDanger() end end
+    local OVER_LEVEL = { { "none", "None" }, { "animated", "Pulsing glow (gold)" }, { "red", "Red outline" }, { "animatedRed", "Pulsing glow (red)" } }
+    local row = CreateFrame("Frame", nil, box); row:SetSize(Widgets.BOX_W - 2 * Widgets.PAD, 26)
+    local lbl = row:CreateFontString(nil, "ARTWORK", "GameFontHighlight"); lbl:SetPoint("LEFT", 4, 0); lbl:SetText("Over-leveled highlight")
+    local dd = Widgets.Dropdown(row, OVER_LEVEL, function() return DB.Danger().overLevelMode end, function(v) DB.Danger().overLevelMode = v; ApplyDanger() end, 150)
+    dd:SetPoint("LEFT", lbl, "RIGHT", 4, -2)
+    box:Add(row, 26, -4)
+    -- Slider fmt is also printed under both ends of the track (OptionsSliderTemplate Low/High): keep it SHORT.
+    box:Add(Widgets.Slider(box, "Over-leveled when the mob is this many levels above you (a skull always counts)", 1, 10, 1,
+      function() return DB.Danger().overLevelThreshold end, function(v) DB.Danger().overLevelThreshold = v; ApplyDanger() end,
+      function(v) return string.format("+%d", v) end), 44, -10)
+    box:Add(Widgets.Slider(box, "Skulls above the name from this many levels above you, one per level (+10 = the game's own rule)", 1, VFS.Danger.SKULL_GAME_LEVELS, 1,
+      function() return DB.Danger().skullAtLevelsAbove end, function(v) DB.Danger().skullAtLevelsAbove = v; ApplyDanger() end,
+      function(v) return string.format("+%d", v) end), 44, -4)
+    box:Add(Widgets.Check(box, "Reaction-coloured health bar",
+      "NPC targets: red hostile, yellow neutral, green friendly instead of the theme green. Players keep green / class colour. Blizzard's own frame only colours the name strip this way.",
+      function() return DB.Danger().reactionHealth == true end, function(v) DB.Danger().reactionHealth = v; ApplyDanger() end), 26, -4)
+  end
   if id == "pet" and Client.PetHappinessFrame and Client.PetHappinessFrame() then
     box:Add(Widgets.Check(box, "Pet info panel on mouse-over",
       "Hover the happiness icon or the pet's level badge (out of combat) for happiness, time to the next mood, XP and training points.",

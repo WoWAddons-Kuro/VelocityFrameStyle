@@ -28,7 +28,7 @@ Detail lives in the numbered specs (07 review, 08 Era plan, 06 atlas). Started 2
 
 - [ ] **NEXT: Player portrait elements still draw ON TOP of the health bar.** Everything in the portrait group (portrait, rim, plate disc) must be UNDER both bars and their borders. `d255cf1` fixed the pet; the player portrait layer still lands above. Likely cause: on Era `PlayerFrame`'s bars are children of a lower-level subframe than the portrait, so `LowestBarLevel()` finds a level the portrait layer cannot get beneath without sinking holder/glow further - verify with `/fstack` levels, then fix the "no room" branch in `Chrome.Create`.
 - [ ] Elite / rare / rareelite / worldboss / `??` verification on Target level + kept skull/boss icons, both clients; record in 03
-- [ ] Danger cues from VelocityPlateStyle on Target / Pet Target: skull-red level at threshold, inline skulls per level above, none for friendly *(spec first)*
+- [x] (Target done 2026-11-27, SPECS/13; Pet Target still open) Danger cues from VelocityPlateStyle on Target / Pet Target: skull-red level at threshold, inline skulls per level above, none for friendly *(spec first)*
 - [ ] Border variants: thinner / smaller-radius atlases as a theme setting + per-frame override *(spec first)*
 - [ ] Alternate rectangular layout preset (radius-0 border + square portrait) *(spec first)*
 - [ ] Combat glow runtime non-uniformity: second copy with offset throb and/or `TextureCoordTranslation` wave

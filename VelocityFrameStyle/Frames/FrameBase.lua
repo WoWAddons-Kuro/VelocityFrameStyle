@@ -88,14 +88,21 @@ function FrameBase.ColorBackdrop(bar, backingAlpha)
 end
 
 -- Colour policy (owner): health GREEN or class colour (players, when classColorHealth); power = PowerBarColor[token].
-local function ApplyHealthColor(bar, unit)
+-- Target `reactionHealth` (SPECS/13, Hardcore option): NPCs get red hostile / yellow neutral / green friendly instead
+-- of green. Players keep the class/green rule. Blizzard itself never reaction-colours this bar (only the name strip).
+local function ApplyHealthColor(bar, unit, frameID)
   local cc
   if DB.Global().classColorHealth and UnitIsPlayer(unit) then
     local _, class = UnitClass(unit)
     class = Util.Plain(class)
     cc = class and (CUSTOM_CLASS_COLORS or RAID_CLASS_COLORS)[class]
   end
-  if cc then bar:SetStatusBarColor(cc.r, cc.g, cc.b) else bar:SetStatusBarColor(0, 1, 0) end
+  if cc then bar:SetStatusBarColor(cc.r, cc.g, cc.b); return end
+  if frameID == "target" and VFS.Danger and DB.Danger().reactionHealth then
+    local r, g, b = VFS.Danger.ReactionColor(unit)
+    if r then bar:SetStatusBarColor(r, g, b); return end
+  end
+  bar:SetStatusBarColor(0, 1, 0)
 end
 
 local function ApplyPowerColor(bar, unit)
@@ -113,7 +120,7 @@ local function HookColor(st, kind, bar)
   hooksecurefunc(bar, "SetStatusBarColor", function(b)
     if b.vfsRecolouring or not DB.Frame(st.id).enabled then return end
     b.vfsRecolouring = true
-    if kind == "health" then ApplyHealthColor(b, st.unit) else ApplyPowerColor(b, st.unit) end
+    if kind == "health" then ApplyHealthColor(b, st.unit, st.id) else ApplyPowerColor(b, st.unit) end
     b.vfsRecolouring = nil
   end)
 end
@@ -536,7 +543,7 @@ function FrameBase.ApplyAppearance(st)
   for kind, bar in pairs(st.bars) do
     if enabled then
       FrameBase.ApplyBarFill(st, bar.stock)
-      if kind == "health" then ApplyHealthColor(bar.stock, st.unit) else ApplyPowerColor(bar.stock, st.unit) end
+      if kind == "health" then ApplyHealthColor(bar.stock, st.unit, st.id) else ApplyPowerColor(bar.stock, st.unit) end
       FrameBase.ColorBackdrop(bar.stock, backing)
       bar.backdrop:Show()
       bar.backdrop.ring:Show()

@@ -58,6 +58,13 @@ DB.DEFAULT_GLOBAL = {
   -- Era hunter pets: hover panel on the happiness icon / pet level badge (SPECS/10)
   petHappinessPanel = true,
   petHappinessPanelShiftOnly = false,   -- show the panel only while Shift is held
+  -- Target danger cues (SPECS/13; port of VelocityPlateStyle's Danger Highlight). Account-wide (owner 2026-11-27).
+  danger = {                            -- VFS_DangerSettings
+    overLevelMode = "animatedRed",      -- VFS_OverLevelMode: none | animated | red | animatedRed
+    overLevelThreshold = 2,             -- unitLevel >= playerLevel + N (or skull) => dangerous (Hardcore: +2)
+    skullAtLevelsAbove = 10,            -- one skull glyph per level above from +N; 10 = the game's own rule (-1 only)
+    reactionHealth = false,             -- Target health bar: red hostile / yellow neutral / green friendly (NPCs only)
+  },
 }
 
 -- VFS_FrameSettings
@@ -150,6 +157,7 @@ end
 function DB.Global() return VFS.db.global end
 function DB.Frame(id) return VFS.db.frames[id] end
 function DB.Elements(id) return VFS.db.frames[id].elements end
+function DB.Danger() return VFS.db.global.danger end   -- VFS_DangerSettings: the ONLY read-site accessor (SPECS/13)
 
 -- Inner fill dimensions, not whole-frame zoom. Defaults stay in Chrome.LAYOUT.
 DB.DIMENSION_CONTROLS = {
