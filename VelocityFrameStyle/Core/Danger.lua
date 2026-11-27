@@ -62,11 +62,18 @@ end
 
 -- Health-bar reaction colour for the `reactionHealth` option (NPCs only; players -> nil = caller's class/green rule).
 -- UnitReaction: 1..3 hostile, 4 neutral, 5..8 friendly. A secret reaction -> nil (never compared).
+-- An attacked neutral keeps reaction 4 but is fighting you: it reads HOSTILE red while in combat (owner 2026-11-27:
+-- "attacked neutral stayed yellow"). The combat test is THE SAME ONE the combat glow uses (Chrome.UpdateCombat:
+-- UnitAffectingCombat(unit) == true), so the red bar and the aggro glow always agree - including on Forever, where
+-- that call is what already lights the glow on aggressive targets.
 function Danger.ReactionColor(unit)
   if Util.Plain(UnitIsPlayer(unit)) == true then return nil end
   local r = Util.PlainNumber(UnitReaction(unit, "player"), nil)
   if r == nil then return nil end
   if r <= 3 then return 1, 0.2, 0.2 end
-  if r == 4 then return 1, 1, 0 end
+  if r == 4 then
+    if UnitAffectingCombat(unit) == true and Danger.IsHostileThreat(unit) then return 1, 0.2, 0.2 end
+    return 1, 1, 0
+  end
   return 0, 1, 0
 end

@@ -121,7 +121,9 @@ ApplyDanger = Target.ApplyDanger
 function Target.OnEvent(event, unit)
   local st = VFS.Frames.target
   if not st then return end
-  if event == "PLAYER_TARGET_CHANGED" or event == "PLAYER_ENTERING_WORLD" then
+  if event == "PLAYER_REGEN_DISABLED" or event == "PLAYER_REGEN_ENABLED" then
+    ApplyDanger(st)        -- reactionHealth on Forever keys an attacked neutral off OUR combat state (Core\Danger.lua)
+  elseif event == "PLAYER_TARGET_CHANGED" or event == "PLAYER_ENTERING_WORLD" then
     PlaceBars(st); FrameBase.Restyle("target"); PlaceSkull(st); FrameBase.OnCombatChanged(st); ApplyDanger(st)
   elseif event == "UNIT_FLAGS" and unit == "target" then
     FrameBase.OnCombatChanged(st); ApplyDanger(st)        -- UnitCanAttack can flip with the flags

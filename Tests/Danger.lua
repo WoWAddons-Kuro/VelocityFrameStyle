@@ -16,6 +16,7 @@ function UnitLevel(u) return units[u].level end
 function UnitCanAttack(_, u) return units[u].attackable end
 function UnitReaction(u) return units[u].reaction end
 function UnitIsPlayer(u) return units[u].player == true end
+function UnitAffectingCombat(u) return units[u].combat end
 
 local danger = { overLevelMode = 'animatedRed', overLevelThreshold = 2, skullAtLevelsAbove = 10, reactionHealth = false }
 ns.DB = { Danger = function() return danger end }
@@ -59,6 +60,9 @@ danger.skullAtLevelsAbove = 10
 local function rgb(...) return { ... } end
 mob(10, true, 2); local c = rgb(D.ReactionColor('target')); assert(c[1] == 1 and c[2] == 0.2, 'hostile red')
 mob(10, true, 4); c = rgb(D.ReactionColor('target')); assert(c[1] == 1 and c[2] == 1 and c[3] == 0, 'neutral yellow')
+units.target.combat = true; c = rgb(D.ReactionColor('target')); assert(c[1] == 1 and c[2] == 0.2, 'attacked neutral => red')
+units.target.combat = secret(true); c = rgb(D.ReactionColor('target')); assert(c[2] == 1, 'secret combat flag => stays yellow')
+units.target.attackable = false; units.target.combat = true; c = rgb(D.ReactionColor('target')); assert(c[2] == 1, 'non-attackable in combat => yellow')
 mob(10, true, 5); c = rgb(D.ReactionColor('target')); assert(c[1] == 0 and c[2] == 1, 'friendly green')
 mob(10, true, 2, true); assert(D.ReactionColor('target') == nil, 'player => nil (class/green rule)')
 mob(10, true, secret(2)); assert(D.ReactionColor('target') == nil, 'secret reaction => nil')
